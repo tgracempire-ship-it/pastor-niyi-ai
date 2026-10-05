@@ -1,6 +1,8 @@
 ﻿"""Pastor Niyi AI: sermon-grounded chat API and web app."""
 import json
 import os
+import re
+import unicodedata
 import shutil
 import tempfile
 import threading
@@ -26,6 +28,53 @@ COLLECTION = "pastor_niyi_sermons"
 MODELS = list(dict.fromkeys(filter(None, [os.getenv("GEMINI_MODEL"), "gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"])))
 TOP_K = 6
 MAX_DISTANCE = 0.65
+CATALOG_FILE = APP_DIR / "sermon_catalog_with_urls.json"
+
+def normalize_title(title):
+    plain = unicodedata.normalize("NFKD", str(title or "")).encode("ascii", "ignore").decode("ascii")
+    return re.sub(r"[^a-z0-9]+", " ", plain.lower()).strip()
+
+def title_aliases(title):
+    normalized = normalize_title(title)
+    aliases = {normalized} if normalized else set()
+    for prefix in ("pastor niyi adetiloye", "niyi adetiloye"):
+        if normalized.startswith(prefix + " "):
+            aliases.add(normalized[len(prefix):].strip())
+    return aliases
+
+@lru_cache(maxsize=1)
+def get_telegram_catalog():
+    if not CATALOG_FILE.is_file():
+        return {}
+    entries = json.loads(CATALOG_FILE.read_text(encoding="utf-8"))
+    catalog = {}
+    for entry in entries:
+        url = entry.get("telegram_url", "")
+        if not url.startswith("https://t.me/"):
+            continue
+        record = {"url": url, "date": entry.get("date", ""), "minister": entry.get("minister", ""), "message_id": entry.get("message_id")}
+        for title in (entry.get("clean_title"), entry.get("raw_title")):
+            for alias in title_aliases(title):
+                records = catalog.setdefault(alias, [])
+                if all(existing["url"] != url for existing in records):
+                    records.append(record)
+    return catalog
+
+def telegram_links_for(title, message_id=None):
+    matches = get_telegram_catalog().get(normalize_title(title), [])
+    if message_id is not None:
+        exact = [item for item in matches if str(item.get("message_id")) == str(message_id)]
+        if exact:
+            matches = exact
+    pastor_matches = [item for item in matches if "niyi" in item["minister"].lower() or "adetiloye" in item["minister"].lower()]
+    if pastor_matches:
+        matches = pastor_matches
+    links = []
+    for item in matches:
+        date = item["date"].split(" ", 1)[0]
+        label = "Listen on Telegram" if len(matches) == 1 else f"Listen on Telegram · {date}"
+        links.append({"url": item["url"], "label": label})
+    return links
 SYSTEM_INSTRUCTION = """You are an AI assistant built on the teachings, sermons, writings, and ministry philosophy of Pastor Niyi Adetiloye of The Designate Church.
 
 Your primary responsibility is to communicate in a manner that reflects his biblical convictions, teaching style, pastoral wisdom, and heart for people.
@@ -196,7 +245,7 @@ def retrieve(collection, exclude, question):
     distances = (results.get("distances") or [[]])[0]
     for document, metadata, distance in zip(documents, metadatas, distances):
         if distance <= MAX_DISTANCE:
-            hits.append({"title": metadata.get("title", "Sermon"), "time": metadata.get("time_range", ""), "text": document, "distance": distance})
+            hits.append({"title": metadata.get("title", "Sermon"), "time": metadata.get("time_range", ""), "text": document, "distance": distance, "message_id": metadata.get("message_id")})
     return hits
 
 def answer(question, hits, history):
@@ -237,7 +286,7 @@ def chat(payload: ChatRequest, request: Request):
         collection, exclude = get_collection()
         hits = retrieve(collection, exclude, payload.message.strip())
         response = answer(payload.message.strip(), hits, history)
-        sources = [{"title": hit["title"], "time": hit["time"], "excerpt": hit["text"][:320]} for hit in hits]
+        sources = [{"title": hit["title"], "time": hit["time"], "excerpt": hit["text"][:320], "telegram_links": telegram_links_for(hit["title"], hit.get("message_id"))} for hit in hits]
         return {"answer": response, "sources": sources}
     except RuntimeError as exc:
         message = str(exc)
@@ -247,4 +296,3 @@ def chat(payload: ChatRequest, request: Request):
     except Exception as exc:
         print(f"Chat request failed: {type(exc).__name__}: {exc}")
         raise HTTPException(status_code=502, detail="I couldn't prepare a response just now. Please try again.") from exc
-
