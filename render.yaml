@@ -10,4 +10,4 @@
       - key: GEMINI_API_KEY
         sync: false
       - key: SERMON_DB_URL
-        sync: false
+        value: https://drive.google.com/drive/folders/1QOyy3nHEx_bUxesok-ICSuTIjZGY4rVm?usp=sharing

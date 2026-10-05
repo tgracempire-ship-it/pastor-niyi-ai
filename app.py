@@ -130,13 +130,26 @@ def _safe_extract(archive: Path, destination: Path):
         zf.extractall(destination)
 
 def ensure_database():
+    """Load Chroma files from a Drive folder, a ZIP archive, or a local ZIP."""
     if (DB_DIR / "chroma.sqlite3").is_file():
         return
     DB_DIR.parent.mkdir(parents=True, exist_ok=True)
     archive_url = os.getenv("SERMON_DB_URL", "").strip() or os.getenv("GDRIVE_DB_URL", "").strip()
     file_id = os.getenv("GDRIVE_FILE_ID", "").strip()
     local_archive = APP_DIR / "sermon_vector_db.zip"
-    if archive_url or file_id:
+
+    if archive_url and "/drive/folders/" in archive_url:
+        import gdown
+        download_dir = Path(tempfile.mkdtemp(prefix="sermon-db-folder-", dir=str(DB_DIR.parent)))
+        try:
+            gdown.download_folder(url=archive_url, output=str(download_dir), quiet=True)
+            sqlite_files = list(download_dir.rglob("chroma.sqlite3"))
+            if not sqlite_files:
+                raise RuntimeError("The shared Drive folder has no chroma.sqlite3. Share the complete sermon_vector_db folder.")
+            shutil.copytree(sqlite_files[0].parent, DB_DIR, dirs_exist_ok=True)
+        finally:
+            shutil.rmtree(download_dir, ignore_errors=True)
+    elif archive_url or file_id:
         import gdown
         fd, temp_name = tempfile.mkstemp(prefix="sermon-db-", suffix=".zip", dir=str(DB_DIR.parent))
         os.close(fd)
@@ -153,9 +166,9 @@ def ensure_database():
             temp_archive.unlink(missing_ok=True)
     elif local_archive.is_file():
         _safe_extract(local_archive, DB_DIR.parent)
-    if not (DB_DIR / "chroma.sqlite3").is_file():
-        raise RuntimeError("Sermon database is missing. Add SERMON_DB_URL or GDRIVE_FILE_ID in Render environment variables.")
 
+    if not (DB_DIR / "chroma.sqlite3").is_file():
+        raise RuntimeError("Sermon database is missing. Add the shared Drive folder or ZIP URL as SERMON_DB_URL in Render environment variables.")
 @lru_cache(maxsize=1)
 def get_collection():
     ensure_database()
@@ -234,3 +247,4 @@ def chat(payload: ChatRequest, request: Request):
     except Exception as exc:
         print(f"Chat request failed: {type(exc).__name__}: {exc}")
         raise HTTPException(status_code=502, detail="I couldn't prepare a response just now. Please try again.") from exc
+
