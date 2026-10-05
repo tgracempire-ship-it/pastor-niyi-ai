@@ -264,6 +264,34 @@ def retrieve(collection, exclude, question):
             hits.append({"title": metadata.get("title", "Sermon"), "time": metadata.get("time_range", ""), "text": document, "distance": distance, "message_id": metadata.get("message_id")})
     return hits
 
+def gemini_status(exc):
+    value = getattr(exc, "status_code", None) or getattr(exc, "code", None)
+    if callable(value):
+        try:
+            value = value()
+        except Exception:
+            value = None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+def explain_gemini_failure(exc):
+    """Turn provider failures into safe, useful guidance without exposing key data."""
+    name = type(exc).__name__.lower()
+    status = gemini_status(exc)
+    if "timeout" in name or "deadline" in name:
+        return "Gemini timed out while generating the answer. Please try again shortly."
+    if status == 429 or "resourceexhausted" in name:
+        return "Gemini reached its rate or usage limit. Check API quota and billing in Google AI Studio."
+    if status in {401, 403} or "permissiondenied" in name or "unauthenticated" in name:
+        return "Gemini rejected the API key or denied model access. Check the key in Render and test it in Google AI Studio."
+    if status == 404 or "notfound" in name:
+        return "The configured Gemini model is unavailable to this API key. Check model access in Google AI Studio."
+    if status is not None and status >= 500:
+        return "Gemini is temporarily unavailable. Please try again shortly."
+    return "Gemini could not generate a reply. Check API key, model access, and quota in Google AI Studio."
+
 def answer(question, hits, history):
     api_key = os.getenv("GEMINI_API_KEY", "").strip()
     if not api_key:
@@ -287,7 +315,7 @@ def answer(question, hits, history):
                 return response.text
         except Exception as exc:
             last_error = exc
-            print(f"[chat-timing] gemini model={model} ms={int((time.perf_counter() - model_started) * 1000)} error={type(exc).__name__}")
+            print(f"[chat-timing] gemini model={model} ms={int((time.perf_counter() - model_started) * 1000)} error={type(exc).__name__} status={gemini_status(exc)}")
     raise RuntimeError("Gemini could not generate a response.") from last_error
 
 @app.get("/")
@@ -326,7 +354,10 @@ def chat(payload: ChatRequest, request: Request):
             cause = exc.__cause__
             if cause:
                 print(f"[chat-error] gemini_cause={type(cause).__name__} code={getattr(cause, 'code', None)} status={getattr(cause, 'status_code', None)}")
-            raise HTTPException(status_code=503, detail="Gemini could not generate a reply. Check the GEMINI_API_KEY and model access in Render.") from exc
+                detail = explain_gemini_failure(cause)
+            else:
+                detail = "Gemini could not generate a reply. Check the API key, model access, and quota in Google AI Studio."
+            raise HTTPException(status_code=503, detail=detail) from exc
         if "Sermon database is not ready" in message:
             raise HTTPException(status_code=503, detail="The sermon library is still starting. Please try again shortly.") from exc
         raise HTTPException(status_code=503, detail="The sermon library is not ready yet. Please try again in a moment.") from exc
