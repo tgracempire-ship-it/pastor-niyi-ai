@@ -24,7 +24,7 @@ WEB_DIR = APP_DIR / "web"
 DB_DIR = Path(os.getenv("SERMON_DB_DIR", str(APP_DIR / "sermon_vector_db"))).resolve()
 EXCLUDE_FILE = APP_DIR / "exclude_titles.json"
 COLLECTION = "pastor_niyi_sermons"
-MODELS = list(dict.fromkeys(filter(None, [os.getenv("GEMINI_MODEL"), "gemini-3.8-flash", "gemini-3.5-flash-lite"])))
+MODELS = list(dict.fromkeys(filter(None, ["gemini-3.8-flash", "gemini-3.5-flash-lite", os.getenv("GEMINI_MODEL")])))
 TOP_K = 6
 MAX_DISTANCE = 0.65
 CATALOG_FILE = APP_DIR / "sermon_catalog_with_urls.json"
@@ -307,7 +307,13 @@ def chat(payload: ChatRequest, request: Request):
         message = str(exc)
         print(f"[chat-error] runtime={message} total_ms={int((time.perf_counter() - request_started) * 1000)}")
         if "Gemini" in message:
-            raise HTTPException(status_code=503, detail="The AI response took too long or is unavailable. Please try again.") from exc
+            if "Gemini is not configured" in message:
+                raise HTTPException(status_code=503, detail="Gemini is not configured. Check the GEMINI_API_KEY environment variable in Render.") from exc
+            cause = exc.__cause__
+            if cause:
+                print(f"[chat-error] gemini_cause={type(cause).__name__} code={getattr(cause, 'code', None)} status={getattr(cause, 'status_code', None)}")
+            raise HTTPException(status_code=503, detail="Gemini could not generate a reply. Check the GEMINI_API_KEY and model access in Render.") from exc
+        raise HTTPException(status_code=503, detail="The sermon library is not ready yet. Please try again in a moment.") from exc
         raise HTTPException(status_code=503, detail="The sermon library is not ready yet. Please try again in a moment.") from exc
     except Exception as exc:
         print(f"[chat-error] type={type(exc).__name__} total_ms={int((time.perf_counter() - request_started) * 1000)}")
