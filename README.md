@@ -1,67 +1,24 @@
-# Pastor Niyi Adetiloye — Sermon Study Assistant
+﻿# Pastor Niyi AI
 
-An intelligent, scripture-grounded conversational assistant built on the teachings, sermons, and ministry philosophy of **Pastor Niyi Adetiloye** (*The Designate Church - TDCI*).
+A public sermon study assistant for Pastor Niyi Adetiloye. One FastAPI service hosts the chat interface and API on Render. Questions are matched against the existing Chroma vector database, then Gemini generates an answer with sermon references.
 
----
+## Deploy on Render
 
-## Key Features & Design
+1. In Render, choose **New → Blueprint** and connect `tgracempire-ship-it/pastor-niyi-ai`.
+2. Enter your Gemini key as `GEMINI_API_KEY` and a Google Drive sharing URL for the sermon database ZIP as `SERMON_DB_URL`.
+3. Make sure the Drive file is accessible to anyone with the link, then deploy. Share the service’s `onrender.com` URL.
 
-1. **Faithful Pastoral Representation (~90% Pastor Niyi)**
-   - Indexed across **760 sermons** and **67,697 transcript chunks**.
-   - Dynamically excludes 101 guest minister sermons (e.g. Pastor Raphael Onilenla, Busayo Oluwadunsin, Jide Olawoyin, Henry Edebatu) at query time via `exclude_titles.json`.
-   - Retains 673 confirmed Pastor Niyi messages + 99 ministry series.
+You can set `GDRIVE_FILE_ID` instead of `SERMON_DB_URL`. Keep the Gemini key in Render environment variables; never put it in this repository or browser code.
 
-2. **10-Point Pastoral Guidance & Response Architecture**
-   - **Concise Direct Answers**: 1–3 clear paragraphs initially.
-   - **Progressive Depth**: Offers deeper scriptural layers (*"For further understanding...", "Let's examine what Scripture teaches..."*).
-   - **Scripture-Centered & Practical**: Contextualized to everyday life, leadership, and personal spiritual growth.
-   - **Structured Discipleship Answers**: Formatted with *Key Truth*, *Biblical Foundation*, *Explanation*, *Practical Application*, and optional *Prayer Point*.
-   - **Inline Sermon Citations**: Direct source attribution `[x] Sermon: "Title" (timestamp)`.
+The included Blueprint uses Render’s free web service plan. Its local files are temporary and may be cleared on restart; the app downloads the database archive again when needed. For a larger or frequently used service, add a persistent disk mounted at `/var/data`, then set `SERMON_DB_DIR=/var/data/sermon_vector_db`. Persistent disks require a paid Render service. Do not commit the database ZIP or extracted files to GitHub.
 
-3. **Self-Contained Vector Database**
-   - ChromaDB embeddings indexed with `all-MiniLM-L6-v2`.
-   - Packaged in `db_chunks/` (under GitHub's 50MB file size threshold) and automatically assembled on first launch.
+## Run locally
 
----
-
-## Local Setup & Running
-
-### 1. Requirements
-Ensure Python 3.10+ is installed:
 ```bash
+python -m venv .venv
+# Windows: .venv\Scripts\activate
+# macOS/Linux: source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 2. Configure API Key
-Create or edit `.streamlit/secrets.toml`:
-```toml
-GEMINI_API_KEY = "YOUR_GEMINI_API_KEY"
-```
-*(Or enter your key directly into the secure sidebar input on the web interface).*
-
-### 3. Launch the Application
-```bash
-streamlit run app.py
-```
-
----
-
-## Deploying 24/7 to Streamlit Community Cloud (Free)
-
-1. **Push to GitHub**:
-   ```bash
-   git add .
-   git commit -m "Initial release of Pastor Niyi Sermon Study Assistant"
-   git remote add origin https://github.com/<YOUR_USERNAME>/pastor-niyi-ai.git
-   git branch -M main
-   git push -u origin main
-   ```
-
-2. **Deploy on Streamlit**:
-   - Go to [share.streamlit.io](https://share.streamlit.io).
-   - Click **New app**, select your repository, set Main file path to `app.py`.
-   - Under **Advanced Settings** -> **Secrets**, add:
-     ```toml
-     GEMINI_API_KEY = "your_actual_gemini_key_here"
-     ```
-   - Click **Deploy**!
+Set `GEMINI_API_KEY` and `SERMON_DB_URL`, then run `uvicorn app:app --reload` and open `http://127.0.0.1:8000`.

@@ -1,4 +1,5 @@
-streamlit
+﻿fastapi
+uvicorn[standard]
 chromadb
 sentence-transformers
 google-genai
