@@ -313,15 +313,23 @@ def answer(question, hits, history):
     config = types.GenerateContentConfig(system_instruction=SYSTEM_INSTRUCTION, temperature=0.4)
     last_error = None
     for model in MODELS:
-        model_started = time.perf_counter()
-        try:
-            response = client.models.generate_content(model=model, contents=prompt, config=config)
-            print(f"[chat-timing] gemini model={model} ms={int((time.perf_counter() - model_started) * 1000)} ok={bool(response and response.text)}")
-            if response and response.text:
-                return response.text
-        except Exception as exc:
-            last_error = exc
-            print(f"[chat-timing] gemini model={model} ms={int((time.perf_counter() - model_started) * 1000)} error={type(exc).__name__} status={gemini_status(exc)}")
+        for attempt in range(2):
+            model_started = time.perf_counter()
+            try:
+                response = client.models.generate_content(model=model, contents=prompt, config=config)
+                print(f"[chat-timing] gemini model={model} attempt={attempt + 1} ms={int((time.perf_counter() - model_started) * 1000)} ok={bool(response and response.text)}")
+                if response and response.text:
+                    return response.text
+                break
+            except Exception as exc:
+                last_error = exc
+                status = gemini_status(exc)
+                print(f"[chat-timing] gemini model={model} attempt={attempt + 1} ms={int((time.perf_counter() - model_started) * 1000)} error={type(exc).__name__} status={status}")
+                transient = status == 429 or (status is not None and status >= 500)
+                if attempt == 0 and transient:
+                    time.sleep(1)
+                    continue
+                break
     raise RuntimeError("Gemini could not generate a response.") from last_error
 
 @app.get("/")
