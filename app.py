@@ -13,7 +13,7 @@ from pathlib import Path
 
 import chromadb
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from google import genai
 from google.genai import types
@@ -335,6 +335,10 @@ def answer(question, hits, history):
 @app.get("/")
 def home():
     return FileResponse(WEB_DIR / "index.html")
+
+@app.head("/")
+def home_head():
+    return Response(status_code=200)
 
 @app.get("/api/health")
 def health():
