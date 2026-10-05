@@ -1,0 +1,7 @@
+.streamlit/secrets.toml
+transcripts/
+__pycache__/
+sermon_vector_db/
+*.zip
+_temp_*
+api_key.txt
