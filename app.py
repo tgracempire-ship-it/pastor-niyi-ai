@@ -24,7 +24,7 @@ WEB_DIR = APP_DIR / "web"
 DB_DIR = Path(os.getenv("SERMON_DB_DIR", str(APP_DIR / "sermon_vector_db"))).resolve()
 EXCLUDE_FILE = APP_DIR / "exclude_titles.json"
 COLLECTION = "pastor_niyi_sermons"
-MODELS = list(dict.fromkeys(filter(None, [os.getenv("GEMINI_MODEL"), "gemini-2.5-flash", "gemini-2.0-flash"])))
+MODELS = list(dict.fromkeys(filter(None, [os.getenv("GEMINI_MODEL"), "gemini-3.8-flash", "gemini-3.5-flash-lite"])))
 TOP_K = 6
 MAX_DISTANCE = 0.65
 CATALOG_FILE = APP_DIR / "sermon_catalog_with_urls.json"
@@ -312,3 +312,4 @@ def chat(payload: ChatRequest, request: Request):
     except Exception as exc:
         print(f"[chat-error] type={type(exc).__name__} total_ms={int((time.perf_counter() - request_started) * 1000)}")
         raise HTTPException(status_code=502, detail="I couldn't prepare a response just now. Please try again.") from exc
+
