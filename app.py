@@ -314,8 +314,8 @@ def chat(payload: ChatRequest, request: Request):
                 print(f"[chat-error] gemini_cause={type(cause).__name__} code={getattr(cause, 'code', None)} status={getattr(cause, 'status_code', None)}")
             raise HTTPException(status_code=503, detail="Gemini could not generate a reply. Check the GEMINI_API_KEY and model access in Render.") from exc
         raise HTTPException(status_code=503, detail="The sermon library is not ready yet. Please try again in a moment.") from exc
-        raise HTTPException(status_code=503, detail="The sermon library is not ready yet. Please try again in a moment.") from exc
     except Exception as exc:
         print(f"[chat-error] type={type(exc).__name__} total_ms={int((time.perf_counter() - request_started) * 1000)}")
         raise HTTPException(status_code=502, detail="I couldn't prepare a response just now. Please try again.") from exc
+
 
