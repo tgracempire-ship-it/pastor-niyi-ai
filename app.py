@@ -30,7 +30,7 @@ else:
     PASTOR_IMG_B64 = "https://images.unsplash.com/photo-1544717305-2782549b5136?w=150"
 
 st.set_page_config(
-    page_title="Pastor Niyi Adetiloye AI",
+    page_title="Pastor Niyi AI",
     page_icon="✝",
     layout="centered",
     initial_sidebar_state="collapsed"
@@ -329,6 +329,60 @@ div[data-testid="stChatInput"] {{
 div[data-testid="stChatInput"] textarea {{
     font-size: 0.92rem !important;
 }}
+
+/* Pastor Niyi AI interface refresh */
+:root {{
+    --pn-ink: #202925;
+    --pn-muted: #56635d;
+    --pn-green: #17362f;
+    --pn-green-soft: #e9efeb;
+    --pn-gold: #c29b5d;
+    --pn-paper: #faf9f6;
+    --pn-line: #e8e8e1;
+}}
+html, body, [data-testid="stAppViewContainer"] {{
+    color: var(--pn-ink) !important;
+    background: var(--pn-paper) !important;
+}}
+.block-container {{ max-width: 760px; padding-top: 1.35rem; padding-bottom: 5.4rem; }}
+.app-header {{ padding-bottom: 1rem; border-bottom-color: var(--pn-line); margin-bottom: 2.1rem; }}
+.header-avatar {{ border: 1px solid #d8d6ca; box-shadow: 0 2px 9px rgba(23, 54, 47, .10); }}
+.status-badge {{ background-color: var(--pn-gold); }}
+.header-text h1 {{ color: var(--pn-green); font-family: 'Libre Baskerville', Georgia, serif; font-size: 1.12rem; font-weight: 400; letter-spacing: -.025em; }}
+.status-text {{ color: #586a60; font-size: .74rem; }}
+.status-dot {{ background-color: var(--pn-gold); }}
+.header-tagline {{ color: #66766d; font-size: .78rem; font-style: normal; }}
+.user-bubble {{ background: var(--pn-green); color: #fff; border-radius: 16px 16px 4px 16px; box-shadow: none; }}
+.user-meta, .assistant-time {{ color: #737e78; }}
+.check-mark {{ color: var(--pn-gold); }}
+.user-avatar-circle {{ background: var(--pn-green); }}
+.assistant-card {{ background: #fff; border-color: var(--pn-line); border-radius: 15px 15px 15px 4px; box-shadow: 0 4px 16px rgba(23, 54, 47, .035); }}
+.assistant-text {{ color: #29342e; }}
+.assistant-followup {{ color: var(--pn-green); }}
+.assistant-divider {{ background: var(--pn-line); }}
+.suggestions-box {{ padding: 0; margin: 0 0 1.45rem; border: 0; border-radius: 0; background: transparent; box-shadow: none; }}
+.suggestions-header {{ justify-content: flex-start; margin: 1.5rem 0 .55rem; }}
+.suggestions-title {{ color: #64736a; font-size: .69rem; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; }}
+.suggestions-title span, .view-all-link {{ display: none; }}
+div[data-testid="column"] button {{ min-height: 42px; border: 1px solid #e4e5dd !important; border-radius: 9px !important; background: rgba(255,255,255,.82) !important; color: #34413b !important; font-size: .78rem !important; font-weight: 500 !important; text-align: left; box-shadow: none !important; transition: border-color .16s ease, background .16s ease, transform .16s ease !important; }}
+div[data-testid="column"] button:hover {{ border-color: #b7c6bb !important; background: #fff !important; color: var(--pn-green) !important; transform: translateY(-1px); }}
+.stExpander {{ border-color: var(--pn-line) !important; border-radius: 10px !important; background: #f7f7f2 !important; }}
+.source-item {{ border-left-width: 1px; border-left-color: #d8d6ca; border-radius: 5px; }}
+.source-title {{ color: var(--pn-green); }}
+div[data-testid="stChatInput"] {{ border: 1px solid #dfe1d8 !important; border-radius: 12px !important; background: #fff !important; box-shadow: 0 5px 19px rgba(23, 54, 47, .07) !important; }}
+div[data-testid="stChatInput"]:focus-within {{ border-color: #789185 !important; }}
+div[data-testid="stChatInput"] textarea {{ color: var(--pn-ink) !important; font-size: .84rem !important; }}
+div[data-testid="stSpinner"] {{ color: var(--pn-green) !important; }}
+@media (max-width: 640px) {{
+    .block-container {{ padding: 1rem 1rem 5.2rem; }}
+    .app-header {{ align-items: flex-start; gap: 10px; margin-bottom: 1.7rem; }}
+    .header-tagline {{ max-width: 115px; padding-top: 4px; text-align: right; line-height: 1.45; }}
+    .header-text h1 {{ font-size: .98rem; }}
+    .assistant-row {{ max-width: 100%; gap: 9px; }}
+    .assistant-card {{ padding: 14px 15px; }}
+    .user-row {{ max-width: 92%; }}
+    .suggestions-box [data-testid="column"] {{ min-width: 100% !important; }}
+}}
 </style>
 """, unsafe_allow_html=True)
 
@@ -515,14 +569,14 @@ st.markdown(f"""
       <span class="status-badge"></span>
     </div>
     <div class="header-text">
-      <h1>Pastor Niyi Adetiloye</h1>
+       <h1>Pastor Niyi AI</h1>
       <div class="status-text">
-        <span class="status-dot"></span> Online
+         <span class="status-dot"></span> Sermon study assistant
       </div>
     </div>
   </div>
   <div class="header-tagline">
-    Wisdom. Scripture. Direction.
+     Explore teachings from Pastor Niyi Adetiloye.
   </div>
 </div>
 """, unsafe_allow_html=True)
@@ -668,25 +722,16 @@ if not st.session_state.history:
     
     col_a, col_b = st.columns(2)
     with col_a:
-        if st.button("How do I grow spiritually?", key="sq_grow", use_container_width=True):
-            st.session_state.pending_query = "How do I grow spiritually?"
+        if st.button("What has Pastor Niyi taught about thanksgiving?", key="sq_thanksgiving", use_container_width=True):
+            st.session_state.pending_query = "What has Pastor Niyi taught about thanksgiving?"
             st.rerun()
-        if st.button("What is biblical courtship?", key="sq_court", use_container_width=True):
-            st.session_state.pending_query = "What is biblical courtship?"
-            st.rerun()
-        if st.button("How do I discover my purpose?", key="sq_purpose", use_container_width=True):
-            st.session_state.pending_query = "How do I discover my purpose?"
+        if st.button("Where should I begin with building my faith?", key="sq_faith", use_container_width=True):
+            st.session_state.pending_query = "Where should I begin with building my faith?"
             st.rerun()
             
     with col_b:
-        if st.button("Help me study Romans.", key="sq_romans", use_container_width=True):
-            st.session_state.pending_query = "Help me study the book of Romans."
-            st.rerun()
-        if st.button("What does the Bible say about fear?", key="sq_fear", use_container_width=True):
-            st.session_state.pending_query = "What does the Bible say about fear?"
-            st.rerun()
-        if st.button("How can I be a better leader?", key="sq_leader", use_container_width=True):
-            st.session_state.pending_query = "How can I be a better Christian leader?"
+        if st.button("Show me teachings about prayer.", key="sq_prayer", use_container_width=True):
+            st.session_state.pending_query = "Show me teachings about prayer."
             st.rerun()
             
     st.markdown("</div>", unsafe_allow_html=True)
@@ -694,7 +739,7 @@ if not st.session_state.history:
 
 # ── HANDLE PROMPT INPUT ──────────────────────────────────────────
 pending = st.session_state.pop("pending_query", None)
-user_input = st.chat_input("Type your message...")
+user_input = st.chat_input("Ask a question about a message…")
 
 query_to_run = pending or user_input
 
