@@ -334,22 +334,35 @@ div[data-testid="stChatInput"] textarea {{
 
 
 def ensure_db():
-    """Extracts sermon database from split chunk files on fresh cloud deployment if needed."""
-    if not os.path.exists(os.path.join(DB_DIR, "chroma.sqlite3")):
-        chunks_dir = os.path.join(APP_DIR, "db_chunks")
-        if os.path.exists(chunks_dir):
-            import glob, zipfile
-            chunk_files = sorted(glob.glob(os.path.join(chunks_dir, "sermon_vector_db.zip.*")))
-            if chunk_files:
-                temp_zip = os.path.join(APP_DIR, "_temp_sermon_db.zip")
-                with open(temp_zip, "wb") as out_f:
-                    for cf in chunk_files:
-                        with open(cf, "rb") as in_f:
-                            while True:
-                                b = in_f.read(2 * 1024 * 1024)
-                                if not b:
-                                    break
-                                out_f.write(b)
+    """Extracts sermon database on startup from local or Google Drive if on cloud."""
+    sqlite_file = os.path.join(DB_DIR, "chroma.sqlite3")
+    if os.path.exists(sqlite_file):
+        return
+
+    # 1. Check local download zip
+    local_zips = [
+        os.path.join(APP_DIR, "sermon_vector_db.zip"),
+        os.path.expanduser(r"~\Downloads\sermon_vector_db-20261005T034509Z-1-001.zip"),
+    ]
+    for pz in local_zips:
+        if os.path.exists(pz):
+            import zipfile
+            with zipfile.ZipFile(pz, "r") as z:
+                z.extractall(APP_DIR)
+            if os.path.exists(sqlite_file):
+                return
+
+    # 2. Check Google Drive URL/ID from Streamlit Secrets
+    gdrive_target = st.secrets.get("GDRIVE_FILE_ID", "") or st.secrets.get("GDRIVE_DB_URL", "")
+    if gdrive_target:
+        import gdown, zipfile
+        temp_zip = os.path.join(APP_DIR, "_sermon_db.zip")
+        with st.spinner("Downloading sermon library archive (~15-20s on cloud)..."):
+            if "drive.google.com" in gdrive_target or "http" in gdrive_target:
+                gdown.download(url=gdrive_target, output=temp_zip, quiet=False, fuzzy=True)
+            else:
+                gdown.download(id=gdrive_target, output=temp_zip, quiet=False)
+            if os.path.exists(temp_zip):
                 with zipfile.ZipFile(temp_zip, "r") as z:
                     z.extractall(APP_DIR)
                 try:
