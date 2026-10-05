@@ -3,7 +3,7 @@
     name: pastor-niyi-ai
     runtime: python
     plan: free
-    buildCommand: pip install -r requirements.txt
+    buildCommand: pip install -r requirements.txt && python prepare_sermon_db.py
     startCommand: uvicorn app:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /api/health
     envVars:

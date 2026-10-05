@@ -24,7 +24,7 @@ WEB_DIR = APP_DIR / "web"
 DB_DIR = Path(os.getenv("SERMON_DB_DIR", str(APP_DIR / "sermon_vector_db"))).resolve()
 EXCLUDE_FILE = APP_DIR / "exclude_titles.json"
 COLLECTION = "pastor_niyi_sermons"
-MODELS = list(dict.fromkeys(filter(None, ["gemini-3.8-flash", "gemini-3.5-flash-lite", os.getenv("GEMINI_MODEL")])))
+MODELS = list(dict.fromkeys(filter(None, ["gemini-3.5-flash-lite", "gemini-3.8-flash", os.getenv("GEMINI_MODEL")])))
 TOP_K = 6
 MAX_DISTANCE = 0.65
 CATALOG_FILE = APP_DIR / "sermon_catalog_with_urls.json"
@@ -219,7 +219,8 @@ def ensure_database():
         raise RuntimeError("Sermon database is missing. Add the shared Drive folder or ZIP URL as SERMON_DB_URL in Render environment variables.")
 @lru_cache(maxsize=1)
 def get_collection():
-    ensure_database()
+    if not (DB_DIR / "chroma.sqlite3").is_file():
+        raise RuntimeError("Sermon database is not ready.")
     client = chromadb.PersistentClient(path=str(DB_DIR))
     try:
         from chromadb.utils.embedding_functions import ONNXMiniLM_L6_V2
@@ -235,6 +236,19 @@ def get_collection():
     else:
         exclude = []
     return collection, exclude
+
+@app.on_event("startup")
+def prepare_sermon_library():
+    """Download missing Drive data and warm Chroma before accepting chat requests."""
+    started = time.perf_counter()
+    try:
+        ensure_database()
+        collection, _ = get_collection()
+        # Trigger Chroma's ONNX model initialization outside the first user request.
+        collection.query(query_texts=["sermon library warmup"], n_results=1)
+        print(f"[startup] sermon_library_ready_ms={int((time.perf_counter() - started) * 1000)}")
+    except Exception as exc:
+        print(f"[startup] sermon_library_error={type(exc).__name__}: {exc}")
 
 def retrieve(collection, exclude, question):
     query = {"query_texts": [question], "n_results": TOP_K}
@@ -260,7 +274,7 @@ def answer(question, hits, history):
     recent = history[-4:]
     convo = "\n".join(f"{turn.role.upper()}: {turn.content[:600]}" for turn in recent) or "(none)"
     prompt = f"Recent conversation:\n{convo}\n\nSermon passages from Pastor Niyi Adetiloye:\n{context}\n\nQuestion: {question}"
-    http_options = types.HttpOptions(timeout=30000, retry_options=types.HttpRetryOptions(attempts=1))
+    http_options = types.HttpOptions(timeout=12000, retry_options=types.HttpRetryOptions(attempts=1))
     client = genai.Client(api_key=api_key, http_options=http_options)
     config = types.GenerateContentConfig(system_instruction=SYSTEM_INSTRUCTION, temperature=0.4)
     last_error = None
@@ -313,6 +327,8 @@ def chat(payload: ChatRequest, request: Request):
             if cause:
                 print(f"[chat-error] gemini_cause={type(cause).__name__} code={getattr(cause, 'code', None)} status={getattr(cause, 'status_code', None)}")
             raise HTTPException(status_code=503, detail="Gemini could not generate a reply. Check the GEMINI_API_KEY and model access in Render.") from exc
+        if "Sermon database is not ready" in message:
+            raise HTTPException(status_code=503, detail="The sermon library is still starting. Please try again shortly.") from exc
         raise HTTPException(status_code=503, detail="The sermon library is not ready yet. Please try again in a moment.") from exc
     except Exception as exc:
         print(f"[chat-error] type={type(exc).__name__} total_ms={int((time.perf_counter() - request_started) * 1000)}")
