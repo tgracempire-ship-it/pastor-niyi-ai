@@ -12,7 +12,6 @@ from functools import lru_cache
 from pathlib import Path
 
 import chromadb
-from chromadb.utils import embedding_functions
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -25,7 +24,7 @@ WEB_DIR = APP_DIR / "web"
 DB_DIR = Path(os.getenv("SERMON_DB_DIR", str(APP_DIR / "sermon_vector_db"))).resolve()
 EXCLUDE_FILE = APP_DIR / "exclude_titles.json"
 COLLECTION = "pastor_niyi_sermons"
-MODELS = list(dict.fromkeys(filter(None, [os.getenv("GEMINI_MODEL"), "gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"])))
+MODELS = list(dict.fromkeys(filter(None, [os.getenv("GEMINI_MODEL"), "gemini-2.5-flash", "gemini-2.0-flash"])))
 TOP_K = 6
 MAX_DISTANCE = 0.65
 CATALOG_FILE = APP_DIR / "sermon_catalog_with_urls.json"
@@ -223,10 +222,13 @@ def get_collection():
     ensure_database()
     client = chromadb.PersistentClient(path=str(DB_DIR))
     try:
-        embedding = embedding_functions.SentenceTransformerEmbeddingFunction(model_name="all-MiniLM-L6-v2")
-        collection = client.get_collection(COLLECTION, embedding_function=embedding)
-    except Exception:
-        # Existing Chroma archives may store their embedding function metadata.
+        from chromadb.utils.embedding_functions import ONNXMiniLM_L6_V2
+        class CompatibleONNX(ONNXMiniLM_L6_V2):
+            def name(self) -> str:
+                return "sentence_transformer"
+        collection = client.get_collection(COLLECTION, embedding_function=CompatibleONNX())
+    except Exception as exc:
+        print(f"[chat-timing] ONNX embedding setup failed: {type(exc).__name__}")
         collection = client.get_collection(COLLECTION)
     if EXCLUDE_FILE.exists():
         exclude = json.loads(EXCLUDE_FILE.read_text(encoding="utf-8"))
@@ -258,16 +260,20 @@ def answer(question, hits, history):
     recent = history[-4:]
     convo = "\n".join(f"{turn.role.upper()}: {turn.content[:600]}" for turn in recent) or "(none)"
     prompt = f"Recent conversation:\n{convo}\n\nSermon passages from Pastor Niyi Adetiloye:\n{context}\n\nQuestion: {question}"
-    client = genai.Client(api_key=api_key)
+    http_options = types.HttpOptions(timeout=30000, retry_options=types.HttpRetryOptions(attempts=1))
+    client = genai.Client(api_key=api_key, http_options=http_options)
     config = types.GenerateContentConfig(system_instruction=SYSTEM_INSTRUCTION, temperature=0.4)
     last_error = None
     for model in MODELS:
+        model_started = time.perf_counter()
         try:
             response = client.models.generate_content(model=model, contents=prompt, config=config)
+            print(f"[chat-timing] gemini model={model} ms={int((time.perf_counter() - model_started) * 1000)} ok={bool(response and response.text)}")
             if response and response.text:
                 return response.text
         except Exception as exc:
             last_error = exc
+            print(f"[chat-timing] gemini model={model} ms={int((time.perf_counter() - model_started) * 1000)} error={type(exc).__name__}")
     raise RuntimeError("Gemini could not generate a response.") from last_error
 
 @app.get("/")
@@ -280,19 +286,29 @@ def health():
 
 @app.post("/api/chat")
 def chat(payload: ChatRequest, request: Request):
+    request_started = time.perf_counter()
     enforce_rate_limit(request.client.host if request.client else "unknown")
     history = [turn for turn in payload.history if turn.role in {"user", "assistant"}]
     try:
+        stage_started = time.perf_counter()
         collection, exclude = get_collection()
+        print(f"[chat-timing] collection_setup_ms={int((time.perf_counter() - stage_started) * 1000)}")
+        stage_started = time.perf_counter()
         hits = retrieve(collection, exclude, payload.message.strip())
+        print(f"[chat-timing] retrieval_ms={int((time.perf_counter() - stage_started) * 1000)} hits={len(hits)}")
+        stage_started = time.perf_counter()
         response = answer(payload.message.strip(), hits, history)
+        print(f"[chat-timing] answer_ms={int((time.perf_counter() - stage_started) * 1000)} total_ms={int((time.perf_counter() - request_started) * 1000)}")
         sources = [{"title": hit["title"], "time": hit["time"], "excerpt": hit["text"][:320], "telegram_links": telegram_links_for(hit["title"], hit.get("message_id"))} for hit in hits]
         return {"answer": response, "sources": sources}
+    except HTTPException:
+        raise
     except RuntimeError as exc:
         message = str(exc)
-        if "Gemini is not configured" in message:
-            raise HTTPException(status_code=503, detail="Pastor Niyi AI is being set up. Please try again later.") from exc
+        print(f"[chat-error] runtime={message} total_ms={int((time.perf_counter() - request_started) * 1000)}")
+        if "Gemini" in message:
+            raise HTTPException(status_code=503, detail="The AI response took too long or is unavailable. Please try again.") from exc
         raise HTTPException(status_code=503, detail="The sermon library is not ready yet. Please try again in a moment.") from exc
     except Exception as exc:
-        print(f"Chat request failed: {type(exc).__name__}: {exc}")
+        print(f"[chat-error] type={type(exc).__name__} total_ms={int((time.perf_counter() - request_started) * 1000)}")
         raise HTTPException(status_code=502, detail="I couldn't prepare a response just now. Please try again.") from exc
