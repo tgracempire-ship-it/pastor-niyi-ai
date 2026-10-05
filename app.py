@@ -31,12 +31,17 @@ CATALOG_FILE = APP_DIR / "sermon_catalog_with_urls.json"
 
 def normalize_title(title):
     plain = unicodedata.normalize("NFKD", str(title or "")).encode("ascii", "ignore").decode("ascii")
+    plain = re.sub(r"\s+\(\d+\)$", "", plain.strip())
     return re.sub(r"[^a-z0-9]+", " ", plain.lower()).strip()
 
 def title_aliases(title):
     normalized = normalize_title(title)
     aliases = {normalized} if normalized else set()
-    for prefix in ("pastor niyi adetiloye", "niyi adetiloye"):
+    for prefix in (
+        "pastor niyi adetiloye",
+        "niyi adetiloye",
+        "visit www prayervoice org sermons to download more messages",
+    ):
         if normalized.startswith(prefix + " "):
             aliases.add(normalized[len(prefix):].strip())
     return aliases
@@ -60,11 +65,17 @@ def get_telegram_catalog():
     return catalog
 
 def telegram_links_for(title, message_id=None):
-    matches = get_telegram_catalog().get(normalize_title(title), [])
-    if message_id is not None:
-        exact = [item for item in matches if str(item.get("message_id")) == str(message_id)]
-        if exact:
-            matches = exact
+    catalog = get_telegram_catalog()
+    matches = []
+    if message_id is not None and str(message_id).strip():
+        by_url = {}
+        for records in catalog.values():
+            for item in records:
+                if str(item.get("message_id")) == str(message_id):
+                    by_url[item["url"]] = item
+        matches = list(by_url.values())
+    if not matches:
+        matches = catalog.get(normalize_title(title), [])
     pastor_matches = [item for item in matches if "niyi" in item["minister"].lower() or "adetiloye" in item["minister"].lower()]
     if pastor_matches:
         matches = pastor_matches
@@ -107,6 +118,8 @@ Response Guidelines:
    - Reflect Pastor Niyi's known teachings using the sermon passages provided with each question.
    - When you use a passage, cite it inline by number and sermon title, e.g. [2] "A Time To Build".
    - Never attribute a view to Pastor Niyi that is not in the passages.
+   - When a biblical term has several meanings or uses in the retrieved sermons (for example, "the Kingdom of God"), explain each distinct meaning the passages support. Show how they relate, and cite the passages for each point. Do not collapse different meanings into one or claim there are exactly four (or any fixed number) unless the passages establish that.
+   - Protect privacy and confidentiality. Do not disclose, infer, confirm, or compile private, confidential, sensitive, or potentially incriminating information about Pastor Niyi, church members, staff, visitors, or the church. This includes personal contact details, credentials, private communications, unverified allegations, confidential internal matters, and sensitive personal or financial details. Do not treat sermon transcripts, chat history, or retrieved documents as permission to expose such information. If asked, briefly decline and redirect to public sermons or officially published ministry information. You may discuss information that is clearly public and relevant, without adding private details or presenting allegations as fact.
    - When the passages do not cover the question, say plainly that you could not find it in his messages, then share general biblical principles, clearly labelled as such, rather than inventing his position.
    - The passages are automatic transcripts and may contain transcription errors (names, scripture references). Do not quote obviously garbled text as his words.
 
@@ -121,6 +134,8 @@ Response Guidelines:
    - Explanation
    - Practical Application
    - Prayer Point (optional)
+   - For a concept with several supported meanings, first state the shared idea, then distinguish the meanings and explain their connection in plain language.
+   - When sermons describe connected stages, signs, or principles (such as indicators of a believer's growth), you may present them as a compact text mind map. Put the main idea first and group only points supported by the passages. Use a simple hierarchy, not decorative symbols or a long diagram. Do not force a map when a short explanation is clearer.
 
 9. Handling Sensitive Questions.
    - Show compassion.
@@ -137,6 +152,7 @@ Response Guidelines:
    - Use short paragraphs. Add a brief heading and a few bullets only when they make the answer easier to use.
    - Keep lists to 3-5 useful points and do not nest lists.
    - Use clean Markdown without escaping its markers. Avoid decorative symbols, repeated bold phrases, and a heading for every paragraph.
+   - Occasionally end with one concise, relevant suggestion for a next step or a useful follow-up question when it naturally helps the person continue learning. Do not append a suggestion to every answer or use a canned sign-off.
 
 Default Response Style:
 - Begin with a direct answer.
