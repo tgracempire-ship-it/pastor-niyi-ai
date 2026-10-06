@@ -1,4 +1,4 @@
-const form = document.querySelector('#chat-form');
+﻿const form = document.querySelector('#chat-form');
 const input = document.querySelector('#message');
 const send = document.querySelector('#send');
 const conversation = document.querySelector('#conversation');
@@ -120,7 +120,7 @@ function renderAnswer(container, answer) {
   flushParagraph();
 }
 
-function addMessage(role, text) {
+function addMessage(role, text, typing = false) {
   const node = document.createElement('article');
   node.className = `message ${role}`;
 
@@ -131,13 +131,10 @@ function addMessage(role, text) {
     avatar.alt = 'Pastor Niyi';
 
     const bubble = document.createElement('div');
-    bubble.className = 'message-bubble assistant-bubble';
-    if (text === 'Searching Pastor Niyi’s messages…') {
-      bubble.classList.add('typing');
-      bubble.textContent = text;
-    } else {
-      renderAnswer(bubble, text);
-    }
+    bubble.className = `message-bubble assistant-bubble${typing ? ' typing' : ''}`;
+    bubble.setAttribute('aria-live', typing ? 'off' : 'polite');
+    if (typing) bubble.textContent = text;
+    else renderAnswer(bubble, text);
 
     node.append(avatar, bubble);
   } else {
@@ -151,7 +148,6 @@ function addMessage(role, text) {
   node.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   return node;
 }
-
 function addSources(bubble, sources) {
   if (!sources.length) return;
 
@@ -191,7 +187,7 @@ function addSources(bubble, sources) {
   bubble.append(box);
 }
 
-async function ask(text) {
+async function ask(text, retrying = false) {
   if (busy || !text.trim()) return;
 
   busy = true;
@@ -199,50 +195,83 @@ async function ask(text) {
   errorBox.hidden = true;
   input.value = '';
   input.style.height = 'auto';
-  addMessage('user', text);
-  const pending = addMessage('assistant', 'Searching Pastor Niyi’s messages…');
+  if (!retrying) addMessage('user', text);
+  const pending = addMessage('assistant', "Searching Pastor Niyi's messages...", true);
+  const bubble = pending.querySelector('.message-bubble');
   send.disabled = true;
+  let answerText = '';
+  let sources = [];
+  let streamError = null;
 
   try {
-    const response = await fetch('/api/chat', {
+    const response = await fetch('/api/chat/stream', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ message: text, history }),
-      signal: AbortSignal.timeout(95000),
+      signal: AbortSignal.timeout(120000),
     });
-    const raw = await response.text();
-    let data = {};
-    try {
-      data = raw ? JSON.parse(raw) : {};
-    } catch {
-      // The message below handles empty or non-JSON gateway responses.
-    }
-
     if (!response.ok) {
+      const raw = await response.text();
+      let data = {};
+      try { data = raw ? JSON.parse(raw) : {}; } catch { /* Use the HTTP status fallback. */ }
       throw new Error(data.detail || `The server returned an error (HTTP ${response.status}). Please try again shortly.`);
     }
-    if (!data.answer) throw new Error('The assistant returned an empty response. Please try again.');
 
-    const bubble = pending.querySelector('.message-bubble');
-    bubble.classList.remove('typing');
-    renderAnswer(bubble, data.answer);
-    addSources(bubble, data.sources || []);
+    await window.readPastorChatStream(response, (name, rawEvent) => {
+      const event = window.readChatEvent(rawEvent);
+      if (name === 'status' && !answerText) {
+        bubble.classList.add('typing');
+        bubble.textContent = event.message || 'Preparing a reply...';
+      } else if (name === 'token' && event.text) {
+        answerText += event.text;
+        bubble.classList.remove('typing');
+        bubble.classList.add('streaming');
+        bubble.setAttribute('aria-live', 'off');
+        renderAnswer(bubble, answerText);
+        pending.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      } else if (name === 'sources') {
+        sources = Array.isArray(event.sources) ? event.sources : [];
+      } else if (name === 'error') {
+        streamError = new Error(event.detail || 'The assistant could not finish the reply. Please try again.');
+      }
+    });
+    if (streamError) throw streamError;
+    if (!answerText.trim()) throw new Error('The assistant returned an empty response. Please try again.');
+
+    bubble.classList.remove('typing', 'streaming');
+    bubble.setAttribute('aria-live', 'polite');
+    renderAnswer(bubble, answerText);
+    addSources(bubble, sources);
     pending.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    history.push({ role: 'user', content: text }, { role: 'assistant', content: data.answer });
+    history.push({ role: 'user', content: text }, { role: 'assistant', content: answerText });
     history = history.slice(-12);
   } catch (err) {
-    pending.remove();
-    errorBox.textContent = err.name === 'TimeoutError' || err.name === 'AbortError'
+    if (answerText) {
+      bubble.classList.remove('typing', 'streaming');
+      bubble.setAttribute('aria-live', 'polite');
+      renderAnswer(bubble, answerText);
+      addSources(bubble, sources);
+    } else {
+      pending.remove();
+    }
+    const message = err.name === 'TimeoutError' || err.name === 'AbortError'
       ? 'That reply took too long. Please try again shortly.'
       : err.message;
+    errorBox.replaceChildren(document.createTextNode(`${message} `));
+    const retry = document.createElement('button');
+    retry.type = 'button';
+    retry.className = 'retry-button';
+    retry.textContent = 'Try again';
+    retry.addEventListener('click', () => ask(text, true));
+    errorBox.append(retry);
     errorBox.hidden = false;
   } finally {
     busy = false;
     send.disabled = false;
-    input.focus();
+    if (errorBox.hidden) input.focus();
+    else errorBox.querySelector('.retry-button')?.focus();
   }
 }
-
 form.addEventListener('submit', (event) => {
   event.preventDefault();
   ask(input.value);

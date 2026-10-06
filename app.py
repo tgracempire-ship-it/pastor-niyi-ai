@@ -13,7 +13,7 @@ from pathlib import Path
 
 import chromadb
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import FileResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from google import genai
 from google.genai import types
@@ -348,6 +348,50 @@ def answer(question, hits, history):
                 break
     raise RuntimeError("Gemini could not generate a response.") from last_error
 
+def answer_stream(question, hits, history):
+    api_key = os.getenv("GEMINI_API_KEY", "").strip()
+    if not api_key:
+        raise RuntimeError("Gemini is not configured yet.")
+    context = "\n\n".join(f"[{i + 1}] Sermon: \"{h['title']}\" ({h['time']})\n{h['text']}" for i, h in enumerate(hits))
+    if not context:
+        context = "(No relevant passages were found in Pastor Niyi's messages for this question.)"
+    recent = history[-4:]
+    convo = "\n".join(f"{turn.role.upper()}: {turn.content[:600]}" for turn in recent) or "(none)"
+    prompt = f"Recent conversation:\n{convo}\n\nSermon passages from Pastor Niyi Adetiloye:\n{context}\n\nQuestion: {question}"
+    http_options = types.HttpOptions(timeout=12000, retry_options=types.HttpRetryOptions(attempts=1))
+    client = genai.Client(api_key=api_key, http_options=http_options)
+    config = types.GenerateContentConfig(system_instruction=SYSTEM_INSTRUCTION, temperature=0.4)
+    last_error = None
+    try:
+        for model in MODELS:
+            for attempt in range(2):
+                model_started = time.perf_counter()
+                emitted = False
+                try:
+                    for chunk in client.models.generate_content_stream(model=model, contents=prompt, config=config):
+                        piece = getattr(chunk, "text", None)
+                        if piece:
+                            emitted = True
+                            yield piece
+                    print(f"[chat-timing] gemini_stream model={model} attempt={attempt + 1} ms={int((time.perf_counter() - model_started) * 1000)} ok={emitted}")
+                    if emitted:
+                        return
+                    break
+                except Exception as exc:
+                    last_error = exc
+                    status = gemini_status(exc)
+                    print(f"[chat-timing] gemini_stream model={model} attempt={attempt + 1} ms={int((time.perf_counter() - model_started) * 1000)} error={type(exc).__name__} status={status}")
+                    if emitted:
+                        raise RuntimeError("Gemini streaming was interrupted.") from exc
+                    transient = status == 429 or (status is not None and status >= 500)
+                    if attempt == 0 and transient:
+                        time.sleep(1)
+                        continue
+                    break
+        raise RuntimeError("Gemini could not generate a response.") from last_error
+    finally:
+        client.close()
+
 @app.get("/")
 def home():
     return FileResponse(WEB_DIR / "index.html")
@@ -359,6 +403,70 @@ def widget():
 @app.get("/widget.js")
 def widget_embed_script():
     return FileResponse(WEB_DIR / "widget-embed.js", media_type="application/javascript")
+
+def sse_event(name, payload):
+    data = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+    return f"event: {name}\ndata: {data}\n\n"
+
+def public_chat_error(exc):
+    message = str(exc)
+    if "Gemini" in message:
+        if "Gemini is not configured" in message:
+            return "Gemini is not configured. Check the GEMINI_API_KEY environment variable in Render."
+        cause = exc.__cause__
+        if cause:
+            print(f"[chat-error] gemini_cause={type(cause).__name__} code={getattr(cause, 'code', None)} status={getattr(cause, 'status_code', None)}")
+            return explain_gemini_failure(cause)
+        return "Gemini could not generate a reply. Check the API key, model access, and quota in Google AI Studio."
+    if "Sermon database is not ready" in message:
+        return "The sermon library is still starting. Please try again shortly."
+    return "The sermon library is not ready yet. Please try again in a moment."
+
+@app.post("/api/chat/stream")
+def chat_stream(payload: ChatRequest, request: Request):
+    request_started = time.perf_counter()
+    enforce_rate_limit(request.client.host if request.client else "unknown")
+    history = [turn for turn in payload.history if turn.role in {"user", "assistant"}]
+
+    def events():
+        hits = []
+        yield sse_event("status", {"message": "Searching Pastor Niyi’s messages…"})
+        try:
+            stage_started = time.perf_counter()
+            collection, exclude = get_collection()
+            print(f"[chat-timing] collection_setup_ms={int((time.perf_counter() - stage_started) * 1000)}")
+            stage_started = time.perf_counter()
+            hits = retrieve(collection, exclude, payload.message.strip())
+            print(f"[chat-timing] retrieval_ms={int((time.perf_counter() - stage_started) * 1000)} hits={len(hits)}")
+            yield sse_event("status", {"message": "Preparing a sermon-grounded reply…"})
+            stage_started = time.perf_counter()
+            pieces = []
+            for piece in answer_stream(payload.message.strip(), hits, history):
+                pieces.append(piece)
+                yield sse_event("token", {"text": piece})
+            if not pieces:
+                raise RuntimeError("Gemini returned an empty response.")
+            sources = [{"title": hit["title"], "time": hit["time"], "excerpt": hit["text"][:320], "telegram_links": telegram_links_for(hit["title"], hit.get("message_id"))} for hit in hits]
+            yield sse_event("sources", {"sources": sources})
+            print(f"[chat-timing] stream_answer_ms={int((time.perf_counter() - stage_started) * 1000)} total_ms={int((time.perf_counter() - request_started) * 1000)}")
+            yield sse_event("done", {})
+        except HTTPException as exc:
+            yield sse_event("error", {"detail": exc.detail})
+        except RuntimeError as exc:
+            print(f"[chat-error] runtime={exc} total_ms={int((time.perf_counter() - request_started) * 1000)}")
+            if hits:
+                sources = [{"title": hit["title"], "time": hit["time"], "excerpt": hit["text"][:320], "telegram_links": telegram_links_for(hit["title"], hit.get("message_id"))} for hit in hits]
+                yield sse_event("sources", {"sources": sources})
+            yield sse_event("error", {"detail": public_chat_error(exc)})
+        except Exception as exc:
+            print(f"[chat-error] type={type(exc).__name__} total_ms={int((time.perf_counter() - request_started) * 1000)}")
+            yield sse_event("error", {"detail": "I couldn’t prepare a response just now. Please try again."})
+
+    return StreamingResponse(
+        events(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache, no-transform", "X-Accel-Buffering": "no", "X-Content-Type-Options": "nosniff"},
+    )
 
 @app.head("/")
 def home_head():

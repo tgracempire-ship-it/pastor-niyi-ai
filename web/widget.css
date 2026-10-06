@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@500;600&display=swap');
+﻿@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@500;600&display=swap');
 
 :root{font-family:'DM Sans',sans-serif;color:#263d34;background:#f8f7f2;font-synthesis:none;text-rendering:optimizeLegibility;color-scheme:light}
 *{box-sizing:border-box}
@@ -56,3 +56,7 @@ button:focus-visible,textarea:focus-visible{outline:2px solid #9c824a;outline-of
 [hidden]{display:none!important}
 @media(max-height:430px){.widget-header{height:56px}.thread{padding-top:10px;padding-bottom:10px}.disclaimer{margin-bottom:5px}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;transition:none!important}}
+
+.typing{color:#637368}.assistant-bubble.streaming::after{content:"";display:inline-block;width:6px;height:6px;margin-left:5px;vertical-align:middle;border-radius:50%;background:#78a683;animation:stream-pulse .7s ease-in-out infinite alternate}@keyframes stream-pulse{to{opacity:.35;transform:scale(.8)}}@media(max-width:520px){.composer textarea{font-size:16px}}
+
+.welcome{font-size:14px}.message-bubble{font-size:14px}.source{font-size:11px}.source-title{color:#7d6332}.composer textarea::placeholder{color:#5f7065}.retry-button{margin-inline-start:6px;padding:4px 8px;border:1px solid #bdcbc0;border-radius:8px;background:#fffefa;color:#284e3d;font:600 11px/1.2 system-ui,sans-serif;cursor:pointer}.retry-button:focus-visible{outline:2px solid #ad8b4d;outline-offset:2px}

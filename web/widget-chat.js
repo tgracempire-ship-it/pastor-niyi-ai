@@ -1,4 +1,4 @@
-const form = document.querySelector('#chat-form');
+﻿const form = document.querySelector('#chat-form');
 const input = document.querySelector('#message');
 const send = document.querySelector('#send');
 const thread = document.querySelector('#thread');
@@ -131,48 +131,90 @@ function addSources(bubble, sources) {
   bubble.append(box);
 }
 
-async function ask(text) {
+async function ask(text, retrying = false) {
   if (busy || !text.trim()) return;
   busy = true;
   errorBox.hidden = true;
   input.value = '';
   input.style.height = 'auto';
-  addMessage('user', text);
-  const pending = addMessage('assistant', '', true);
+  if (!retrying) addMessage('user', text);
+  const pending = addMessage('assistant', "Searching Pastor Niyi's messages...", true);
+  const bubble = pending.querySelector('.message-bubble');
   send.disabled = true;
+  let answerText = '';
+  let sources = [];
+  let streamError = null;
   document.querySelectorAll('.suggestions').forEach((el) => el.remove());
+
   try {
-    const response = await fetch('/api/chat', {
+    const response = await fetch('/api/chat/stream', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ message: text, history }),
-      signal: AbortSignal.timeout(95000),
+      signal: AbortSignal.timeout(120000),
     });
-    const raw = await response.text();
-    let data = {};
-    try { data = raw ? JSON.parse(raw) : {}; } catch { /* Show a useful fallback below. */ }
-    if (!response.ok) throw new Error(data.detail || `The service returned an error (${response.status}). Please try again shortly.`);
-    if (!data.answer) throw new Error('The assistant returned an empty reply. Please try again.');
-    const bubble = pending.querySelector('.message-bubble');
-    bubble.classList.remove('typing');
-    renderAnswer(bubble, data.answer);
-    addSources(bubble, data.sources || []);
+    if (!response.ok) {
+      const raw = await response.text();
+      let data = {};
+      try { data = raw ? JSON.parse(raw) : {}; } catch { /* Use the HTTP status fallback. */ }
+      throw new Error(data.detail || `The service returned an error (${response.status}). Please try again shortly.`);
+    }
+
+    await window.readPastorChatStream(response, (name, rawEvent) => {
+      const event = window.readChatEvent(rawEvent);
+      if (name === 'status' && !answerText) {
+        bubble.classList.add('typing');
+        bubble.textContent = event.message || 'Preparing a reply...';
+      } else if (name === 'token' && event.text) {
+        answerText += event.text;
+        bubble.classList.remove('typing');
+        bubble.classList.add('streaming');
+        bubble.setAttribute('aria-live', 'off');
+        renderAnswer(bubble, answerText);
+        thread.scrollTop = thread.scrollHeight;
+      } else if (name === 'sources') {
+        sources = Array.isArray(event.sources) ? event.sources : [];
+      } else if (name === 'error') {
+        streamError = new Error(event.detail || 'The assistant could not finish the reply. Please try again.');
+      }
+    });
+    if (streamError) throw streamError;
+    if (!answerText.trim()) throw new Error('The assistant returned an empty reply. Please try again.');
+
+    bubble.classList.remove('typing', 'streaming');
+    bubble.setAttribute('aria-live', 'polite');
+    renderAnswer(bubble, answerText);
+    addSources(bubble, sources);
     thread.scrollTop = thread.scrollHeight;
-    history.push({ role: 'user', content: text }, { role: 'assistant', content: data.answer });
+    history.push({ role: 'user', content: text }, { role: 'assistant', content: answerText });
     history.splice(0, Math.max(0, history.length - 12));
   } catch (err) {
-    pending.remove();
-    errorBox.textContent = err.name === 'TimeoutError' || err.name === 'AbortError'
+    if (answerText) {
+      bubble.classList.remove('typing', 'streaming');
+      bubble.setAttribute('aria-live', 'polite');
+      renderAnswer(bubble, answerText);
+      addSources(bubble, sources);
+    } else {
+      pending.remove();
+    }
+    const message = err.name === 'TimeoutError' || err.name === 'AbortError'
       ? 'That reply took too long. Please try again shortly.'
       : err.message;
+    errorBox.replaceChildren(document.createTextNode(`${message} `));
+    const retry = document.createElement('button');
+    retry.type = 'button';
+    retry.className = 'retry-button';
+    retry.textContent = 'Try again';
+    retry.addEventListener('click', () => ask(text, true));
+    errorBox.append(retry);
     errorBox.hidden = false;
   } finally {
     busy = false;
     send.disabled = false;
-    input.focus();
+    if (errorBox.hidden) input.focus();
+    else errorBox.querySelector('.retry-button')?.focus();
   }
 }
-
 form.addEventListener('submit', (event) => { event.preventDefault(); ask(input.value); });
 input.addEventListener('input', () => { input.style.height = 'auto'; input.style.height = `${Math.min(input.scrollHeight, 100)}px`; });
 input.addEventListener('keydown', (event) => {
