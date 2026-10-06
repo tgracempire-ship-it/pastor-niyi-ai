@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f8f7f2">
+  <title>Ask Pastor Niyi AI</title>
+  <link rel="stylesheet" href="/web/widget.css">
+</head>
+<body>
+  <main class="widget" aria-label="Pastor Niyi AI chat">
+    <header class="widget-header">
+      <img class="avatar" src="/assets/pastor_niyi.webp" alt="">
+      <div class="identity">
+        <strong>Pastor Niyi AI</strong>
+        <span><i></i> Grounded in sermons</span>
+      </div>
+      <button id="close" class="close" type="button" aria-label="Close chat" title="Close chat">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>
+      </button>
+    </header>
+
+    <section id="thread" class="thread" aria-live="polite" aria-label="Conversation">
+      <div class="welcome">
+        <p>Welcome. What would you like to understand today?</p>
+        <div class="suggestions" aria-label="Suggested questions">
+          <button type="button" data-prompt="What does the Bible teach about growing in faith?">Growing in faith</button>
+          <button type="button" data-prompt="How can I trust God in a difficult season?">Trusting God</button>
+        </div>
+      </div>
+    </section>
+
+    <div id="error" class="error" role="status" hidden></div>
+    <form id="chat-form" class="composer">
+      <label class="sr-only" for="message">Ask a question</label>
+      <textarea id="message" rows="1" maxlength="2000" placeholder="Ask about faith, life, or the sermons…" required></textarea>
+      <button id="send" type="submit" aria-label="Send question">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5m-6 6 6-6 6 6"/></svg>
+      </button>
+    </form>
+    <p class="disclaimer">AI can make mistakes. Check scripture and seek trusted pastoral counsel.</p>
+  </main>
+  <script src="/web/widget-chat.js" defer></script>
+</body>
+</html>

@@ -352,6 +352,14 @@ def answer(question, hits, history):
 def home():
     return FileResponse(WEB_DIR / "index.html")
 
+@app.get("/widget")
+def widget():
+    return FileResponse(WEB_DIR / "widget.html")
+
+@app.get("/widget.js")
+def widget_embed_script():
+    return FileResponse(WEB_DIR / "widget-embed.js", media_type="application/javascript")
+
 @app.head("/")
 def home_head():
     return Response(status_code=200)
