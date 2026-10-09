@@ -321,7 +321,7 @@ def answer(question, hits, history):
     context = "\n\n".join(f"[{i + 1}] Sermon: \"{h['title']}\" ({h['time']})\n{h['text']}" for i, h in enumerate(hits))
     if not context:
         context = "(No relevant passages were found in Pastor Niyi's messages for this question.)"
-    recent = history[-4:]
+    recent = history[-12:]
     convo = "\n".join(f"{turn.role.upper()}: {turn.content[:600]}" for turn in recent) or "(none)"
     prompt = f"Recent conversation:\n{convo}\n\nSermon passages from Pastor Niyi Adetiloye:\n{context}\n\nQuestion: {question}"
     http_options = types.HttpOptions(timeout=12000, retry_options=types.HttpRetryOptions(attempts=1))
@@ -355,7 +355,7 @@ def answer_stream(question, hits, history):
     context = "\n\n".join(f"[{i + 1}] Sermon: \"{h['title']}\" ({h['time']})\n{h['text']}" for i, h in enumerate(hits))
     if not context:
         context = "(No relevant passages were found in Pastor Niyi's messages for this question.)"
-    recent = history[-4:]
+    recent = history[-12:]
     convo = "\n".join(f"{turn.role.upper()}: {turn.content[:600]}" for turn in recent) or "(none)"
     prompt = f"Recent conversation:\n{convo}\n\nSermon passages from Pastor Niyi Adetiloye:\n{context}\n\nQuestion: {question}"
     http_options = types.HttpOptions(timeout=12000, retry_options=types.HttpRetryOptions(attempts=1))

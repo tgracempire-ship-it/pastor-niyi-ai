@@ -3,7 +3,8 @@ const input = document.querySelector('#message');
 const send = document.querySelector('#send');
 const thread = document.querySelector('#thread');
 const errorBox = document.querySelector('#error');
-const history = [];
+const historyKey = 'pastor-niyi-ai:widget:v1';
+let history = window.loadPastorChatHistory(historyKey);
 let busy = false;
 
 function cleanMarkdown(text) {
@@ -144,14 +145,15 @@ async function ask(text, retrying = false) {
   let answerText = '';
   let sources = [];
   let streamError = null;
+  const timeout = window.createPastorChatTimeout(120000);
   document.querySelectorAll('.suggestions').forEach((el) => el.remove());
 
   try {
     const response = await fetch('/api/chat/stream', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: text, history }),
-      signal: AbortSignal.timeout(120000),
+      body: JSON.stringify({ message: text, history: history.map(({ role, content }) => ({ role, content })) }),
+      signal: timeout.signal,
     });
     if (!response.ok) {
       const raw = await response.text();
@@ -186,8 +188,9 @@ async function ask(text, retrying = false) {
     renderAnswer(bubble, answerText);
     addSources(bubble, sources);
     thread.scrollTop = thread.scrollHeight;
-    history.push({ role: 'user', content: text }, { role: 'assistant', content: answerText });
-    history.splice(0, Math.max(0, history.length - 12));
+    history.push({ role: 'user', content: text }, { role: 'assistant', content: answerText, sources });
+    history = history.slice(-12);
+    window.savePastorChatHistory(historyKey, history);
   } catch (err) {
     if (answerText) {
       bubble.classList.remove('typing', 'streaming');
@@ -209,6 +212,7 @@ async function ask(text, retrying = false) {
     errorBox.append(retry);
     errorBox.hidden = false;
   } finally {
+    timeout.clear();
     busy = false;
     send.disabled = false;
     if (errorBox.hidden) input.focus();
@@ -221,6 +225,17 @@ input.addEventListener('keydown', (event) => {
   if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); form.requestSubmit(); }
 });
 document.querySelectorAll('.suggestions button').forEach((button) => button.addEventListener('click', () => ask(button.dataset.prompt)));
+
+if (history.length) {
+  thread.querySelector('.welcome')?.remove();
+  for (const turn of history) {
+    const row = addMessage(turn.role, turn.content);
+    if (turn.role === 'assistant' && turn.sources?.length) {
+      addSources(row.querySelector('.message-bubble'), turn.sources);
+    }
+  }
+}
+
 document.querySelector('#close').addEventListener('click', () => {
   window.parent.postMessage({ type: 'pastor-niyi-ai:close' }, '*');
 });

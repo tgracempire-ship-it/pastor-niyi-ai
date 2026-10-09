@@ -1,3 +1,10 @@
+window.createPastorChatTimeout = function createPastorChatTimeout(milliseconds) {
+  if (typeof AbortController === 'undefined') return { signal: undefined, clear() {} };
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), milliseconds);
+  return { signal: controller.signal, clear: () => window.clearTimeout(timer) };
+};
+
 window.readPastorChatStream = async function readPastorChatStream(response, onEvent) {
   if (!response.body || typeof response.body.getReader !== 'function') {
     throw new Error('Your browser cannot display a live reply. Please reload or use an updated browser.');
@@ -46,4 +53,34 @@ window.readPastorChatStream = async function readPastorChatStream(response, onEv
 
 window.readChatEvent = function readChatEvent(data) {
   try { return JSON.parse(data); } catch { return {}; }
+};
+
+window.loadPastorChatHistory = function loadPastorChatHistory(key) {
+  try {
+    const saved = JSON.parse(window.localStorage.getItem(key) || '[]');
+    if (!Array.isArray(saved)) return [];
+    return saved
+      .filter((turn) => turn && ['user', 'assistant'].includes(turn.role) && typeof turn.content === 'string')
+      .slice(-12)
+      .map((turn) => ({
+        role: turn.role,
+        content: turn.content.slice(0, 12000),
+        ...(turn.role === 'assistant' && Array.isArray(turn.sources) ? {
+          sources: turn.sources.slice(0, 8).filter((source) => source && typeof source === 'object').map((source) => ({
+            title: String(source.title || 'Sermon').slice(0, 300),
+            time: String(source.time || '').slice(0, 80),
+            telegram_links: Array.isArray(source.telegram_links) ? source.telegram_links.slice(0, 5)
+              .filter((link) => link && typeof link.url === 'string')
+              .map((link) => ({ url: link.url.slice(0, 500), label: String(link.label || 'Listen on Telegram').slice(0, 80) })) : [],
+          })),
+        } : {}),
+      }));
+  } catch {
+    return [];
+  }
+};
+
+window.savePastorChatHistory = function savePastorChatHistory(key, history) {
+  try { window.localStorage.setItem(key, JSON.stringify(history.slice(-12))); }
+  catch { /* Keep the active conversation working if browser storage is unavailable. */ }
 };

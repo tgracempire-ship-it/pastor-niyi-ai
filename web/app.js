@@ -5,7 +5,8 @@ const conversation = document.querySelector('#conversation');
 const welcome = document.querySelector('#welcome');
 const errorBox = document.querySelector('#error');
 
-let history = [];
+const historyKey = 'pastor-niyi-ai:main:v1';
+let history = window.loadPastorChatHistory(historyKey);
 let busy = false;
 
 function cleanMarkdown(text) {
@@ -202,13 +203,14 @@ async function ask(text, retrying = false) {
   let answerText = '';
   let sources = [];
   let streamError = null;
+  const timeout = window.createPastorChatTimeout(120000);
 
   try {
     const response = await fetch('/api/chat/stream', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: text, history }),
-      signal: AbortSignal.timeout(120000),
+      body: JSON.stringify({ message: text, history: history.map(({ role, content }) => ({ role, content })) }),
+      signal: timeout.signal,
     });
     if (!response.ok) {
       const raw = await response.text();
@@ -243,8 +245,9 @@ async function ask(text, retrying = false) {
     renderAnswer(bubble, answerText);
     addSources(bubble, sources);
     pending.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    history.push({ role: 'user', content: text }, { role: 'assistant', content: answerText });
+    history.push({ role: 'user', content: text }, { role: 'assistant', content: answerText, sources });
     history = history.slice(-12);
+    window.savePastorChatHistory(historyKey, history);
   } catch (err) {
     if (answerText) {
       bubble.classList.remove('typing', 'streaming');
@@ -266,6 +269,7 @@ async function ask(text, retrying = false) {
     errorBox.append(retry);
     errorBox.hidden = false;
   } finally {
+    timeout.clear();
     busy = false;
     send.disabled = false;
     if (errorBox.hidden) input.focus();
@@ -292,3 +296,13 @@ input.addEventListener('keydown', (event) => {
 document.querySelectorAll('.suggestion').forEach((button) => {
   button.addEventListener('click', () => ask(button.dataset.prompt));
 });
+
+if (history.length) {
+  welcome.hidden = true;
+  for (const turn of history) {
+    const row = addMessage(turn.role, turn.content);
+    if (turn.role === 'assistant' && turn.sources?.length) {
+      addSources(row.querySelector('.message-bubble'), turn.sources);
+    }
+  }
+}
