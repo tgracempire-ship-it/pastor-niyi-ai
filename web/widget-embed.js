@@ -9,14 +9,14 @@
   const shadow = root.attachShadow({ mode: 'open' });
   const style = document.createElement('style');
   style.textContent = `
-    :host{all:initial;position:fixed;z-index:2147483000;right:22px;bottom:22px;font-family:system-ui,sans-serif;color:#243a32}
+    :host{all:initial;position:fixed;z-index:2147483000;right:22px;bottom:22px;font-family:system-ui,sans-serif;color:#243a32;pointer-events:none}
     :host([data-position="bottom-left"]){right:auto;left:22px}
     *{box-sizing:border-box}
-    .launcher{width:58px;height:58px;display:grid;place-items:center;border:0;border-radius:20px;background:#1e463a;color:#f2dfad;box-shadow:0 8px 26px #18362b42;cursor:pointer;transition:transform .18s,background .18s,box-shadow .18s}
+    .launcher{width:58px;height:58px;display:grid;place-items:center;border:0;border-radius:20px;background:#1e463a;color:#f2dfad;box-shadow:0 8px 26px #18362b42;cursor:pointer;transition:transform .18s,background .18s,box-shadow .18s;pointer-events:auto}
     .launcher:hover{transform:translateY(-2px);background:#285744;box-shadow:0 11px 30px #18362b4d}
     .launcher:focus-visible,.close:focus-visible{outline:3px solid #ad8b4d;outline-offset:3px}
     .launcher svg{width:25px;height:25px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
-    .panel{position:absolute;right:0;bottom:74px;width:min(390px,calc(100vw - 32px));height:min(640px,calc(100dvh - 116px));min-height:390px;overflow:hidden;border:1px solid #dfdfd5;border-radius:19px;background:#f8f7f2;box-shadow:0 18px 60px #20372b36;transform-origin:bottom right;animation:open .2s cubic-bezier(.2,.8,.2,1)}
+    .panel{position:absolute;right:0;bottom:74px;width:min(390px,calc(100vw - 32px));height:min(640px,calc(100dvh - 116px));min-height:390px;overflow:hidden;border:1px solid #dfdfd5;border-radius:19px;background:#f8f7f2;box-shadow:0 18px 60px #20372b36;transform-origin:bottom right;animation:open .2s cubic-bezier(.2,.8,.2,1);pointer-events:auto}
     :host([data-position="bottom-left"]) .panel{right:auto;left:0;transform-origin:bottom left}
     .panel[hidden]{display:none}
     iframe{display:block;width:100%;height:100%;border:0;background:#f8f7f2}
