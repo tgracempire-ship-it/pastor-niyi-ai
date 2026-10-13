@@ -321,47 +321,13 @@ def social_reply(question):
             return "Alright. I’m here whenever you have a question about faith or Pastor Niyi’s teachings."
     return None
 
-SERMON_INTENT_TERMS = (
-    "bible", "biblical", "scripture", "god", "jesus", "christ", "holy spirit",
-    "faith", "prayer", "pray", "church", "sermon", "preach", "preaching",
-    "pastor", "niyi", "teaching", "teachings", "ministry", "gospel", "kingdom",
-    "salvation", "righteousness", "grace", "sin", "repentance", "worship",
-    "fasting", "anointing", "healing", "miracle", "deliverance", "disciple",
-    "believer", "spiritual", "calling", "purpose", "forgive", "forgiveness",
-    "marriage", "relationship", "anxiety", "fear", "grief", "temptation",
-    "trust", "hope", "worry", "discouragement", "suffering", "hardship",
-    "lonely", "loneliness", "guidance", "wisdom", "growth", "grow", "strength",
-    "weakness", "leadership",
-    "covenant", "prophecy", "prosperity", "tithe", "offering", "communion",
-    "born again", "word of god", "kingdom of god", "christian life",
-)
-
-SERMON_FOLLOW_UP = re.compile(
-    r"^(?:and |but |so )?(?:what about|how about|why|how|can you explain|tell me more|"
-    r"tell me about (?:him|her|that|it)|what does that mean|what do you mean|"
-    r"go deeper|explain further|more examples|continue|give me an example|"
-    r"how can i apply|what should i do|is that|does that|can i|should i)\b"
-)
-
 def should_search_sermons(question, history):
-    """Route only sermon, Bible, and pastoral topics through vector retrieval."""
+    """Search every substantive message; skip only standalone small talk."""
     text = re.sub(r"[^a-z0-9']+", " ", str(question or "").casefold())
     text = re.sub(r"\s+", " ", text).strip()
     if not text or social_reply(text):
         return False, "social"
-
-    # Short follow-ups continue the grounded thread when recent turns contain
-    # clear signs that the discussion is about sermons or Christian teaching.
-    prior = " ".join(turn.content[-1200:].casefold() for turn in history[-4:])
-    has_grounded_context = any(term in prior for term in (
-        "sermon", "pastor niyi", "scripture", "bible", "faith", "god", "jesus",
-    ))
-    if has_grounded_context and len(text.split()) <= 12 and SERMON_FOLLOW_UP.search(text):
-        return True, "follow_up"
-
-    if any(re.search(rf"\b{re.escape(term)}(?:s|es)?\b", text) for term in SERMON_INTENT_TERMS):
-        return True, "faith_or_sermon_topic"
-    return False, "general"
+    return True, "substantive_message"
 
 def gemini_status(exc):
     value = getattr(exc, "status_code", None) or getattr(exc, "code", None)
