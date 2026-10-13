@@ -176,6 +176,7 @@ class ChatRequest(BaseModel):
 
 _rate_lock = threading.Lock()
 _rate_counts = {}
+_sermon_warmup_done = threading.Event()
 
 def enforce_rate_limit(ip: str):
     now = time.time()
@@ -259,18 +260,30 @@ def get_collection():
         exclude = []
     return collection, exclude
 
-@app.on_event("startup")
 def prepare_sermon_library():
-    """Download missing Drive data and warm Chroma before accepting chat requests."""
+    """Download missing Drive data and warm Chroma in a background thread."""
     started = time.perf_counter()
     try:
         ensure_database()
         collection, _ = get_collection()
-        # Trigger Chroma's ONNX model initialization outside the first user request.
+        # Warm the embedding model without holding up landing page requests.
         collection.query(query_texts=["sermon library warmup"], n_results=1)
         print(f"[startup] sermon_library_ready_ms={int((time.perf_counter() - started) * 1000)}")
     except Exception as exc:
         print(f"[startup] sermon_library_error={type(exc).__name__}: {exc}")
+    finally:
+        _sermon_warmup_done.set()
+
+@app.on_event("startup")
+def start_sermon_library_warmup():
+    """Let the web app start responding while the sermon index initializes."""
+    threading.Thread(target=prepare_sermon_library, name="sermon-library-warmup", daemon=True).start()
+
+def get_ready_collection():
+    """Wait for the single background Chroma initialization before retrieval."""
+    if not _sermon_warmup_done.wait(timeout=90):
+        raise RuntimeError("Sermon database is still starting.")
+    return get_collection()
 
 def retrieve(collection, exclude, question):
     query = {"query_texts": [question], "n_results": TOP_K}
@@ -513,7 +526,7 @@ def chat_stream(payload: ChatRequest, request: Request):
             if search_sermons:
                 yield sse_event("status", {"message": "Searching Pastor Niyi’s messages…"})
                 stage_started = time.perf_counter()
-                collection, exclude = get_collection()
+                collection, exclude = get_ready_collection()
                 print(f"[chat-timing] collection_setup_ms={int((time.perf_counter() - stage_started) * 1000)}")
                 stage_started = time.perf_counter()
                 hits = retrieve(collection, exclude, payload.message.strip())
@@ -572,7 +585,7 @@ def chat(payload: ChatRequest, request: Request):
         hits = []
         if search_sermons:
             stage_started = time.perf_counter()
-            collection, exclude = get_collection()
+            collection, exclude = get_ready_collection()
             print(f"[chat-timing] collection_setup_ms={int((time.perf_counter() - stage_started) * 1000)}")
             stage_started = time.perf_counter()
             hits = retrieve(collection, exclude, payload.message.strip())
