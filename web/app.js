@@ -197,7 +197,7 @@ async function ask(text, retrying = false) {
   input.value = '';
   input.style.height = 'auto';
   if (!retrying) addMessage('user', text);
-  const pending = addMessage('assistant', "Searching Pastor Niyi's messages...", true);
+  const pending = addMessage('assistant', 'Thinking...', true);
   const bubble = pending.querySelector('.message-bubble');
   send.disabled = true;
   let answerText = '';

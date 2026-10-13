@@ -286,6 +286,29 @@ def retrieve(collection, exclude, question):
             hits.append({"title": metadata.get("title", "Sermon"), "time": metadata.get("time_range", ""), "text": document, "distance": distance, "message_id": metadata.get("message_id")})
     return hits
 
+def social_reply(question):
+    """Answer standalone pleasantries without loading or querying the sermon index."""
+    text = re.sub(r"[^a-z0-9']+", " ", str(question or "").casefold()).strip()
+    text = re.sub(r"\s+", " ", text)
+    honorific = r"(?: pastor(?: niyi)?| sir| ma| assistant| ai)?"
+    patterns = (
+        ("greeting", rf"(?:hi|hello|hey|heya|howdy|greetings|good morning|good afternoon|good evening|morning|afternoon|evening)(?: there)?{honorific}(?: (?:how are you|how are you doing|what'?s up))?"),
+        ("greeting", rf"(?:how are you|how are you doing|how is it going|what'?s up)(?: today)?{honorific}"),
+        ("thanks", rf"(?:thanks?|thank you|thx|much appreciated){honorific}(?: (?:so much|very much))?"),
+        ("farewell", rf"(?:bye|goodbye|good bye|see you|see you later|good night){honorific}"),
+        ("acknowledgement", rf"(?:ok|okay|alright|all right|got it|understood){honorific}"),
+    )
+    for kind, pattern in patterns:
+        if re.fullmatch(pattern, text):
+            if kind == "greeting":
+                return "Hello! What would you like to explore about faith, life, or Pastor Niyi’s teachings?"
+            if kind == "thanks":
+                return "You’re welcome. Is there another question you’d like to explore?"
+            if kind == "farewell":
+                return "Grace to you. You’re welcome back anytime."
+            return "Alright. I’m here whenever you have a question about faith or Pastor Niyi’s teachings."
+    return None
+
 def gemini_status(exc):
     value = getattr(exc, "status_code", None) or getattr(exc, "code", None)
     if callable(value):
@@ -430,6 +453,14 @@ def chat_stream(payload: ChatRequest, request: Request):
 
     def events():
         hits = []
+        quick_reply = social_reply(payload.message)
+        if quick_reply:
+            yield sse_event("status", {"message": "Responding…"})
+            yield sse_event("token", {"text": quick_reply})
+            yield sse_event("sources", {"sources": []})
+            print(f"[chat-timing] search_skipped=social total_ms={int((time.perf_counter() - request_started) * 1000)}")
+            yield sse_event("done", {})
+            return
         yield sse_event("status", {"message": "Searching Pastor Niyi’s messages…"})
         try:
             stage_started = time.perf_counter()
@@ -481,6 +512,9 @@ def chat(payload: ChatRequest, request: Request):
     request_started = time.perf_counter()
     enforce_rate_limit(request.client.host if request.client else "unknown")
     history = [turn for turn in payload.history if turn.role in {"user", "assistant"}]
+    quick_reply = social_reply(payload.message)
+    if quick_reply:
+        return {"answer": quick_reply, "sources": []}
     try:
         stage_started = time.perf_counter()
         collection, exclude = get_collection()
