@@ -11,12 +11,9 @@ import zipfile
 from functools import lru_cache
 from pathlib import Path
 
-import chromadb
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
-from google import genai
-from google.genai import types
 from pydantic import BaseModel, Field
 
 APP_DIR = Path(__file__).resolve().parent
@@ -242,6 +239,8 @@ def ensure_database():
         raise RuntimeError("Sermon database is missing. Add the shared Drive folder or ZIP URL as SERMON_DB_URL in Render environment variables.")
 @lru_cache(maxsize=1)
 def get_collection():
+    import chromadb
+
     if not (DB_DIR / "chroma.sqlite3").is_file():
         raise RuntimeError("Sermon database is not ready.")
     client = chromadb.PersistentClient(path=str(DB_DIR))
@@ -393,6 +392,9 @@ def explain_gemini_failure(exc):
     return "Gemini could not generate a reply. Check API key, model access, and quota in Google AI Studio."
 
 def answer(question, hits, history, sermon_search_performed=True):
+    from google import genai
+    from google.genai import types
+
     api_key = os.getenv("GEMINI_API_KEY", "").strip()
     if not api_key:
         raise RuntimeError("Gemini is not configured yet.")
@@ -429,6 +431,9 @@ def answer(question, hits, history, sermon_search_performed=True):
     raise RuntimeError("Gemini could not generate a response.") from last_error
 
 def answer_stream(question, hits, history, sermon_search_performed=True):
+    from google import genai
+    from google.genai import types
+
     api_key = os.getenv("GEMINI_API_KEY", "").strip()
     if not api_key:
         raise RuntimeError("Gemini is not configured yet.")
