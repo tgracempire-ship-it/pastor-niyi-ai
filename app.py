@@ -309,6 +309,48 @@ def social_reply(question):
             return "Alright. I’m here whenever you have a question about faith or Pastor Niyi’s teachings."
     return None
 
+SERMON_INTENT_TERMS = (
+    "bible", "biblical", "scripture", "god", "jesus", "christ", "holy spirit",
+    "faith", "prayer", "pray", "church", "sermon", "preach", "preaching",
+    "pastor", "niyi", "teaching", "teachings", "ministry", "gospel", "kingdom",
+    "salvation", "righteousness", "grace", "sin", "repentance", "worship",
+    "fasting", "anointing", "healing", "miracle", "deliverance", "disciple",
+    "believer", "spiritual", "calling", "purpose", "forgive", "forgiveness",
+    "marriage", "relationship", "anxiety", "fear", "grief", "temptation",
+    "trust", "hope", "worry", "discouragement", "suffering", "hardship",
+    "lonely", "loneliness", "guidance", "wisdom", "growth", "grow", "strength",
+    "weakness", "leadership",
+    "covenant", "prophecy", "prosperity", "tithe", "offering", "communion",
+    "born again", "word of god", "kingdom of god", "christian life",
+)
+
+SERMON_FOLLOW_UP = re.compile(
+    r"^(?:and |but |so )?(?:what about|how about|why|how|can you explain|tell me more|"
+    r"tell me about (?:him|her|that|it)|what does that mean|what do you mean|"
+    r"go deeper|explain further|more examples|continue|give me an example|"
+    r"how can i apply|what should i do|is that|does that|can i|should i)\b"
+)
+
+def should_search_sermons(question, history):
+    """Route only sermon, Bible, and pastoral topics through vector retrieval."""
+    text = re.sub(r"[^a-z0-9']+", " ", str(question or "").casefold())
+    text = re.sub(r"\s+", " ", text).strip()
+    if not text or social_reply(text):
+        return False, "social"
+
+    # Short follow-ups continue the grounded thread when recent turns contain
+    # clear signs that the discussion is about sermons or Christian teaching.
+    prior = " ".join(turn.content[-1200:].casefold() for turn in history[-4:])
+    has_grounded_context = any(term in prior for term in (
+        "sermon", "pastor niyi", "scripture", "bible", "faith", "god", "jesus",
+    ))
+    if has_grounded_context and len(text.split()) <= 12 and SERMON_FOLLOW_UP.search(text):
+        return True, "follow_up"
+
+    if any(re.search(rf"\b{re.escape(term)}(?:s|es)?\b", text) for term in SERMON_INTENT_TERMS):
+        return True, "faith_or_sermon_topic"
+    return False, "general"
+
 def gemini_status(exc):
     value = getattr(exc, "status_code", None) or getattr(exc, "code", None)
     if callable(value):
@@ -337,16 +379,18 @@ def explain_gemini_failure(exc):
         return "Gemini is temporarily unavailable. Please try again shortly."
     return "Gemini could not generate a reply. Check API key, model access, and quota in Google AI Studio."
 
-def answer(question, hits, history):
+def answer(question, hits, history, sermon_search_performed=True):
     api_key = os.getenv("GEMINI_API_KEY", "").strip()
     if not api_key:
         raise RuntimeError("Gemini is not configured yet.")
     context = "\n\n".join(f"[{i + 1}] Sermon: \"{h['title']}\" ({h['time']})\n{h['text']}" for i, h in enumerate(hits))
     if not context:
-        context = "(No relevant passages were found in Pastor Niyi's messages for this question.)"
+        context = ("(No relevant passages were found in Pastor Niyi's messages for this question.)"
+                   if sermon_search_performed else "(The sermon archive was not searched for this request.)")
     recent = history[-12:]
     convo = "\n".join(f"{turn.role.upper()}: {turn.content[:600]}" for turn in recent) or "(none)"
-    prompt = f"Recent conversation:\n{convo}\n\nSermon passages from Pastor Niyi Adetiloye:\n{context}\n\nQuestion: {question}"
+    routing_note = "" if sermon_search_performed else "\n\nRouting note: The sermon archive was not searched because this message does not appear to need Pastor Niyi's sermon teachings. Answer the user's request directly and naturally. Do not say that the sermon archive had no relevant passages, and do not invent or attribute a sermon teaching."
+    prompt = f"Recent conversation:\n{convo}\n\nSermon passages from Pastor Niyi Adetiloye:\n{context}{routing_note}\n\nQuestion: {question}"
     http_options = types.HttpOptions(timeout=12000, retry_options=types.HttpRetryOptions(attempts=1))
     client = genai.Client(api_key=api_key, http_options=http_options)
     config = types.GenerateContentConfig(system_instruction=SYSTEM_INSTRUCTION, temperature=0.4)
@@ -371,16 +415,18 @@ def answer(question, hits, history):
                 break
     raise RuntimeError("Gemini could not generate a response.") from last_error
 
-def answer_stream(question, hits, history):
+def answer_stream(question, hits, history, sermon_search_performed=True):
     api_key = os.getenv("GEMINI_API_KEY", "").strip()
     if not api_key:
         raise RuntimeError("Gemini is not configured yet.")
     context = "\n\n".join(f"[{i + 1}] Sermon: \"{h['title']}\" ({h['time']})\n{h['text']}" for i, h in enumerate(hits))
     if not context:
-        context = "(No relevant passages were found in Pastor Niyi's messages for this question.)"
+        context = ("(No relevant passages were found in Pastor Niyi's messages for this question.)"
+                   if sermon_search_performed else "(The sermon archive was not searched for this request.)")
     recent = history[-12:]
     convo = "\n".join(f"{turn.role.upper()}: {turn.content[:600]}" for turn in recent) or "(none)"
-    prompt = f"Recent conversation:\n{convo}\n\nSermon passages from Pastor Niyi Adetiloye:\n{context}\n\nQuestion: {question}"
+    routing_note = "" if sermon_search_performed else "\n\nRouting note: The sermon archive was not searched because this message does not appear to need Pastor Niyi's sermon teachings. Answer the user's request directly and naturally. Do not say that the sermon archive had no relevant passages, and do not invent or attribute a sermon teaching."
+    prompt = f"Recent conversation:\n{convo}\n\nSermon passages from Pastor Niyi Adetiloye:\n{context}{routing_note}\n\nQuestion: {question}"
     http_options = types.HttpOptions(timeout=12000, retry_options=types.HttpRetryOptions(attempts=1))
     client = genai.Client(api_key=api_key, http_options=http_options)
     config = types.GenerateContentConfig(system_instruction=SYSTEM_INSTRUCTION, temperature=0.4)
@@ -461,18 +507,24 @@ def chat_stream(payload: ChatRequest, request: Request):
             print(f"[chat-timing] search_skipped=social total_ms={int((time.perf_counter() - request_started) * 1000)}")
             yield sse_event("done", {})
             return
-        yield sse_event("status", {"message": "Searching Pastor Niyi’s messages…"})
+        search_sermons, route_reason = should_search_sermons(payload.message, history)
+        hits = []
         try:
-            stage_started = time.perf_counter()
-            collection, exclude = get_collection()
-            print(f"[chat-timing] collection_setup_ms={int((time.perf_counter() - stage_started) * 1000)}")
-            stage_started = time.perf_counter()
-            hits = retrieve(collection, exclude, payload.message.strip())
-            print(f"[chat-timing] retrieval_ms={int((time.perf_counter() - stage_started) * 1000)} hits={len(hits)}")
-            yield sse_event("status", {"message": "Preparing a sermon-grounded reply…"})
+            if search_sermons:
+                yield sse_event("status", {"message": "Searching Pastor Niyi’s messages…"})
+                stage_started = time.perf_counter()
+                collection, exclude = get_collection()
+                print(f"[chat-timing] collection_setup_ms={int((time.perf_counter() - stage_started) * 1000)}")
+                stage_started = time.perf_counter()
+                hits = retrieve(collection, exclude, payload.message.strip())
+                print(f"[chat-timing] retrieval_ms={int((time.perf_counter() - stage_started) * 1000)} hits={len(hits)}")
+                yield sse_event("status", {"message": "Preparing a sermon-grounded reply…"})
+            else:
+                yield sse_event("status", {"message": "Preparing a helpful reply…"})
+                print(f"[chat-timing] search_skipped={route_reason}")
             stage_started = time.perf_counter()
             pieces = []
-            for piece in answer_stream(payload.message.strip(), hits, history):
+            for piece in answer_stream(payload.message.strip(), hits, history, search_sermons):
                 pieces.append(piece)
                 yield sse_event("token", {"text": piece})
             if not pieces:
@@ -516,14 +568,19 @@ def chat(payload: ChatRequest, request: Request):
     if quick_reply:
         return {"answer": quick_reply, "sources": []}
     try:
+        search_sermons, route_reason = should_search_sermons(payload.message, history)
+        hits = []
+        if search_sermons:
+            stage_started = time.perf_counter()
+            collection, exclude = get_collection()
+            print(f"[chat-timing] collection_setup_ms={int((time.perf_counter() - stage_started) * 1000)}")
+            stage_started = time.perf_counter()
+            hits = retrieve(collection, exclude, payload.message.strip())
+            print(f"[chat-timing] retrieval_ms={int((time.perf_counter() - stage_started) * 1000)} hits={len(hits)}")
+        else:
+            print(f"[chat-timing] search_skipped={route_reason}")
         stage_started = time.perf_counter()
-        collection, exclude = get_collection()
-        print(f"[chat-timing] collection_setup_ms={int((time.perf_counter() - stage_started) * 1000)}")
-        stage_started = time.perf_counter()
-        hits = retrieve(collection, exclude, payload.message.strip())
-        print(f"[chat-timing] retrieval_ms={int((time.perf_counter() - stage_started) * 1000)} hits={len(hits)}")
-        stage_started = time.perf_counter()
-        response = answer(payload.message.strip(), hits, history)
+        response = answer(payload.message.strip(), hits, history, search_sermons)
         print(f"[chat-timing] answer_ms={int((time.perf_counter() - stage_started) * 1000)} total_ms={int((time.perf_counter() - request_started) * 1000)}")
         sources = [{"title": hit["title"], "time": hit["time"], "excerpt": hit["text"][:320], "telegram_links": telegram_links_for(hit["title"], hit.get("message_id"))} for hit in hits]
         return {"answer": response, "sources": sources}
