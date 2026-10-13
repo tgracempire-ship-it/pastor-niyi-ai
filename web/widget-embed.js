@@ -4,11 +4,15 @@
 
   const base = new URL(script.src, window.location.href);
   const position = script.dataset.position === 'bottom-left' ? 'bottom-left' : 'bottom-right';
+  // Keep host-page integration limited to this isolated shadow root and the
+  // cross-origin chat iframe. Put widget UI and application changes in the iframe;
+  // never query, style, or modify the embedding site's other elements.
   const root = document.createElement('div');
   root.dataset.pastorNiyiAiWidget = '';
   const shadow = root.attachShadow({ mode: 'open' });
   const style = document.createElement('style');
   style.textContent = `
+    /* The fixed host can cover the phone viewport, so it must pass input through. */
     :host{all:initial;position:fixed;z-index:2147483000;right:22px;bottom:22px;font-family:system-ui,sans-serif;color:#243a32;pointer-events:none}
     :host([data-position="bottom-left"]){right:auto;left:22px}
     *{box-sizing:border-box}
