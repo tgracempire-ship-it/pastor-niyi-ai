@@ -55,10 +55,30 @@ window.readChatEvent = function readChatEvent(data) {
   try { return JSON.parse(data); } catch { return {}; }
 };
 
+const PASTOR_CHAT_HISTORY_TTL_MS = 10 * 60 * 1000;
+
+function clearPastorChatHistory(key) {
+  try {
+    window.localStorage.removeItem(key);
+    window.localStorage.removeItem(`${key}:savedAt`);
+  } catch { /* Keep chat available when browser storage is unavailable. */ }
+}
+
 window.loadPastorChatHistory = function loadPastorChatHistory(key) {
   try {
+    const savedAtValue = window.localStorage.getItem(`${key}:savedAt`);
+    const savedAt = Number(savedAtValue);
+    const now = Date.now();
+    if (!savedAtValue || !Number.isFinite(savedAt) || savedAt > now || now - savedAt >= PASTOR_CHAT_HISTORY_TTL_MS) {
+      clearPastorChatHistory(key);
+      return [];
+    }
+
     const saved = JSON.parse(window.localStorage.getItem(key) || '[]');
-    if (!Array.isArray(saved)) return [];
+    if (!Array.isArray(saved)) {
+      clearPastorChatHistory(key);
+      return [];
+    }
     return saved
       .filter((turn) => turn && ['user', 'assistant'].includes(turn.role) && typeof turn.content === 'string')
       .slice(-12)
@@ -76,11 +96,17 @@ window.loadPastorChatHistory = function loadPastorChatHistory(key) {
         } : {}),
       }));
   } catch {
+    clearPastorChatHistory(key);
     return [];
   }
 };
 
 window.savePastorChatHistory = function savePastorChatHistory(key, history) {
-  try { window.localStorage.setItem(key, JSON.stringify(history.slice(-12))); }
-  catch { /* Keep the active conversation working if browser storage is unavailable. */ }
+  try {
+    window.localStorage.setItem(key, JSON.stringify(history.slice(-12)));
+    window.localStorage.setItem(`${key}:savedAt`, String(Date.now()));
+  } catch {
+    clearPastorChatHistory(key);
+    /* Keep the active conversation working if browser storage is unavailable. */
+  }
 };
