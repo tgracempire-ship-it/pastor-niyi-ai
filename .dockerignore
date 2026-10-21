@@ -1,0 +1,31 @@
+# ── Version control & caches ──────────────────────────────────────────────────
+.git
+.gitignore
+.github
+
+# ── Python byte-code ──────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+
+# ── Secrets / local config ────────────────────────────────────────────────────
+api_key.txt
+.env
+.env.*
+.streamlit/
+
+# ── Dev / data files not needed at runtime ────────────────────────────────────
+transcripts/
+REVIEW_unmatched.txt
+render.yaml
+README.md
+
+# ── IDE & OS noise ────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.DS_Store
+Thumbs.db
+
+# NOTE: sermon_vector_db/ is intentionally NOT excluded.
+# The 386 MB Chroma database is baked into the image so the app starts
+# instantly without downloading from Google Drive on every Cloud Run cold start.
