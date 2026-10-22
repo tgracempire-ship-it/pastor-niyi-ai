@@ -1,4 +1,4 @@
-﻿"""Pastor Niyi AI: sermon-grounded chat API and web app."""
+"""Pastor Niyi AI: sermon-grounded chat API and web app."""
 import json
 import os
 import re
@@ -21,7 +21,7 @@ WEB_DIR = APP_DIR / "web"
 DB_DIR = Path(os.getenv("SERMON_DB_DIR", str(APP_DIR / "sermon_vector_db"))).resolve()
 EXCLUDE_FILE = APP_DIR / "exclude_titles.json"
 COLLECTION = "pastor_niyi_sermons"
-MODELS = list(dict.fromkeys(filter(None, ["gemini-3.5-flash-lite", "gemini-3.8-flash", os.getenv("GEMINI_MODEL")])))
+MODELS = list(dict.fromkeys(filter(None, [os.getenv("GEMINI_MODEL"), "gemini-3.5-flash", "gemini-3.5-flash-lite", "gemini-3-flash-preview", "gemini-3.1-flash-lite"])))
 TOP_K = 6
 MAX_DISTANCE = 0.65
 CATALOG_FILE = APP_DIR / "sermon_catalog_with_urls.json"
