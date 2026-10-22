@@ -15,8 +15,8 @@ RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
 # ── Stage 2: runtime ──────────────────────────────────────────────────────────
 FROM python:3.12-slim
 
-# Cloud Run requires the app to listen on the PORT env-var (default 8080)
-ENV PORT=8080 \
+# Hugging Face Spaces defaults to port 7860; can be overridden by $PORT on Cloud Run / Render
+ENV PORT=7860 \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
@@ -28,16 +28,15 @@ COPY --from=builder /install /usr/local
 # Copy the full application (Chroma DB is baked in; see .dockerignore for exclusions)
 COPY . .
 
-# Create a non-root user for security
-RUN useradd --no-create-home --shell /bin/false appuser \
+# Create a non-root user for security (Hugging Face user id 1000)
+RUN useradd -u 1000 --no-create-home --shell /bin/false appuser \
     && chown -R appuser:appuser /app
 USER appuser
 
-# Health check — Cloud Run also polls /api/health for startup probes
+# Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=90s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:${PORT}/api/health')"
 
-EXPOSE $PORT
+EXPOSE 7860
 
-# Cloud Run sends SIGTERM on scale-down; uvicorn handles it cleanly
 CMD exec uvicorn app:app --host 0.0.0.0 --port "$PORT" --workers 1 --timeout-keep-alive 75
