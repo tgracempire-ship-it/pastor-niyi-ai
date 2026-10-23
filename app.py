@@ -770,11 +770,13 @@ def admin_login(payload: AdminLoginRequest):
 
 @app.post("/api/admin/change-password")
 def admin_change_pwd(payload: ChangePasswordRequest, request: Request):
-    require_admin(request)
+    if not verify_admin_password(payload.old_password):
+        raise HTTPException(status_code=401, detail="Incorrect current password.")
     success, msg = change_admin_password(payload.old_password, payload.new_password)
     if not success:
         raise HTTPException(status_code=400, detail=msg)
-    return {"ok": True, "message": msg}
+    new_token = create_admin_session()
+    return {"ok": True, "message": msg, "token": new_token}
 
 @app.get("/api/admin/feedbacks")
 def admin_get_feedbacks(request: Request, status: str = "all", category: str = "all", search: str = ""):

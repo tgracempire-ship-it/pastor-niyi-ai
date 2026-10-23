@@ -447,13 +447,19 @@ async function handleChangePassword() {
       throw new Error(data.detail || 'Password change failed.');
     }
 
+    if (data.token) {
+      setAdminToken(data.token, true);
+    }
+
     changePwdSuccess.textContent = 'Password updated successfully! Keep it safe.';
     changePwdSuccess.hidden = false;
     defaultPwdBadge.hidden = true;
 
     setTimeout(() => {
       closeChangePasswordModal();
-    }, 1400);
+      showDashboard();
+      loadFeedbacks();
+    }, 1200);
   } catch (err) {
     changePwdError.textContent = err.message;
     changePwdError.hidden = false;
