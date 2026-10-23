@@ -344,3 +344,46 @@ def remove_user_bookmark(user_id: str, bookmark_id: str) -> List[Dict[str, Any]]
     user["bookmarks"] = [b for b in user.get("bookmarks", []) if b.get("id") != bookmark_id]
     _save_users(users)
     return user["bookmarks"]
+
+
+def authenticate_member_email(email: str, name: str = "") -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
+    """Instant passwordless member profile using email."""
+    email = str(email or "").strip().lower()
+    if not email or "@" not in email:
+        return None, None
+    users = _load_users()
+    user_id = f"usr_{hashlib.md5(email.encode()).hexdigest()[:12]}"
+    now = datetime.now(timezone.utc).isoformat()
+    if user_id in users:
+        user = users[user_id]
+        user["last_login"] = now
+        if name and not user.get("name"):
+            user["name"] = name.strip()
+    else:
+        user = {
+            "id": user_id,
+            "email": email,
+            "name": name.strip() or email.split("@")[0].title(),
+            "picture": "",
+            "provider": "email",
+            "created_at": now,
+            "last_login": now,
+            "bookmarks": []
+        }
+        users[user_id] = user
+    _save_users(users)
+    token = _create_user_token(user_id, email)
+    return user, token
+
+def get_google_client_id() -> str:
+    env_id = os.getenv("GOOGLE_CLIENT_ID", "").strip()
+    if env_id:
+        return env_id
+    auth = _load_admin_auth()
+    return auth.get("google_client_id", "").strip()
+
+def set_google_client_id(client_id: str) -> bool:
+    auth = _load_admin_auth()
+    auth["google_client_id"] = str(client_id or "").strip()
+    ADMIN_AUTH_FILE.write_text(json.dumps(auth, indent=2), encoding="utf-8")
+    return True

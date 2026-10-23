@@ -155,7 +155,7 @@ function addSources(bubble, sources) {
   const box = document.createElement('div');
   box.className = 'sources';
   const label = document.createElement('strong');
-  label.textContent = 'Sermon references';
+  label.textContent = 'Sermon references & recordings';
   box.append(label);
 
   for (const source of sources) {
@@ -169,15 +169,21 @@ function addSources(bubble, sources) {
     for (const link of source.telegram_links || []) {
       try {
         const url = new URL(link.url);
-        const isAllowed = url.protocol === 'https:' && (url.hostname === 't.me' || url.hostname.endsWith('youtube.com') || url.hostname === 'youtu.be');
-        if (!isAllowed) continue;
+        const isYT = url.hostname.includes('youtube.com') || url.hostname === 'youtu.be';
+        const isTG = url.hostname === 't.me';
+        if (!isYT && !isTG) continue;
+
         const anchor = document.createElement('a');
-        const isYT = url.hostname.includes('youtu');
-        anchor.className = isYT ? 'listen-link youtube-link' : 'listen-link';
+        if (isYT) {
+          anchor.className = 'listen-link youtube-link';
+          anchor.textContent = '▶ ' + (link.label || 'Watch on YouTube');
+        } else {
+          anchor.className = 'listen-link telegram-link';
+          anchor.textContent = '🎧 ' + (link.label || 'Listen on Telegram');
+        }
         anchor.href = url.href;
         anchor.target = '_blank';
         anchor.rel = 'noopener noreferrer';
-        anchor.textContent = link.label || (url.hostname.includes('youtu') ? 'Watch on YouTube' : 'Listen on Telegram');
         row.append(anchor);
       } catch {
         // Ignore malformed source links while keeping the sermon reference visible.
@@ -621,24 +627,124 @@ window.removeBookmark = async function(bookmarkId) {
   }
 };
 
-// Google Sign-In Trigger
-openAuthBtn?.addEventListener('click', () => {
-  // Check if Google GSI is available
-  if (window.google?.accounts?.id) {
+// --- Auth Modal & Sign-In Handlers ---
+const authModal = document.getElementById('auth-modal');
+const closeAuthBtn = document.getElementById('close-auth-btn');
+const cancelAuthBtn = document.getElementById('cancel-auth-btn');
+const memberLoginForm = document.getElementById('member-login-form');
+const memberEmailInput = document.getElementById('member-email');
+const memberNameInput = document.getElementById('member-name');
+const memberSubmitBtn = document.getElementById('member-submit-btn');
+const authErrorAlert = document.getElementById('auth-error-alert');
+const triggerGoogleBtn = document.getElementById('trigger-google-oauth-btn');
+const googleHintText = document.getElementById('google-hint-text');
+
+let configuredGoogleClientId = '';
+
+function openAuthModal() {
+  if (!authModal) return;
+  authModal.hidden = false;
+  if (authErrorAlert) authErrorAlert.hidden = true;
+  if (memberEmailInput) memberEmailInput.value = '';
+  setTimeout(() => memberEmailInput?.focus(), 150);
+}
+
+function closeAuthModal() {
+  if (authModal) authModal.hidden = true;
+}
+
+openAuthBtn?.addEventListener('click', openAuthModal);
+closeAuthBtn?.addEventListener('click', closeAuthModal);
+cancelAuthBtn?.addEventListener('click', closeAuthModal);
+
+authModal?.addEventListener('click', (e) => {
+  if (e.target === authModal) closeAuthModal();
+});
+
+window.submitMemberLogin = async function() {
+  const email = memberEmailInput?.value?.trim();
+  const name = memberNameInput?.value?.trim() || '';
+
+  if (!email || !email.includes('@')) {
+    if (authErrorAlert) {
+      authErrorAlert.textContent = 'Please enter a valid email address.';
+      authErrorAlert.hidden = false;
+    }
+    return;
+  }
+
+  if (memberSubmitBtn) {
+    memberSubmitBtn.disabled = true;
+    const spinner = memberSubmitBtn.querySelector('.sheet-spinner');
+    if (spinner) spinner.hidden = false;
+  }
+  if (authErrorAlert) authErrorAlert.hidden = true;
+
+  try {
+    const res = await fetch('/api/auth/member', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, name })
+    });
+
+    const data = await res.json();
+    if (!res.ok || !data.ok) {
+      throw new Error(data.detail || 'Sign-in failed. Please try again.');
+    }
+
+    setUserToken(data.token);
+    showSignedInUI(data.user);
+    closeAuthModal();
+  } catch (err) {
+    if (authErrorAlert) {
+      authErrorAlert.textContent = err.message;
+      authErrorAlert.hidden = false;
+    }
+  } finally {
+    if (memberSubmitBtn) {
+      memberSubmitBtn.disabled = false;
+      const spinner = memberSubmitBtn.querySelector('.sheet-spinner');
+      if (spinner) spinner.hidden = true;
+    }
+  }
+};
+
+// Check Google OAuth Config & Setup
+async function initGoogleOAuth() {
+  try {
+    const res = await fetch('/api/auth/config');
+    const data = await res.json();
+    if (data.google_client_id) {
+      configuredGoogleClientId = data.google_client_id;
+      if (window.google?.accounts?.id) {
+        window.google.accounts.id.initialize({
+          client_id: configuredGoogleClientId,
+          callback: window.handleGoogleSignInResponse,
+          auto_select: false
+        });
+        const container = document.getElementById('google-button-rendered');
+        if (container) {
+          window.google.accounts.id.renderButton(container, {
+            theme: 'outline',
+            size: 'large',
+            width: 280
+          });
+          container.hidden = false;
+          if (triggerGoogleBtn) triggerGoogleBtn.hidden = true;
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('Could not fetch Google auth config:', err);
+  }
+}
+
+triggerGoogleBtn?.addEventListener('click', () => {
+  if (configuredGoogleClientId && window.google?.accounts?.id) {
     window.google.accounts.id.prompt();
   } else {
-    // Graceful prompt for sign in
-    const email = prompt('Enter your email to sign in or create your member profile:');
-    if (email && email.includes('@')) {
-      // Simulate Google Sign-In credential payload
-      const mockPayload = {
-        email: email.trim().toLowerCase(),
-        name: email.split('@')[0],
-        sub: 'mock_' + Date.now()
-      };
-      const fakeJwt = 'eyJhbGciOiJIUzI1NiJ9.' + btoa(JSON.stringify(mockPayload)) + '.signature';
-      handleGoogleCredential(fakeJwt);
-    }
+    // Helpful guidance when Google Client ID has not been pasted yet
+    alert('Google OAuth requires an OAuth Client ID from Google Cloud Console.\n\nYou can sign in instantly with your email address above right now!\n\nTo enable Google 1-Tap button, paste your Google Client ID in the Executive Admin Console at /admin.');
   }
 });
 
@@ -671,6 +777,7 @@ window.handleGoogleSignInResponse = function(response) {
 // Initialize user auth on DOM ready
 document.addEventListener('DOMContentLoaded', () => {
   checkUserSession();
+  initGoogleOAuth();
 });
 
 // Helper for escaping

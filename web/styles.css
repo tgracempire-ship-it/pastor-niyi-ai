@@ -584,3 +584,117 @@
     padding: 18px 16px 20px;
   }
 }
+
+
+/* Google OAuth Button & Auth Divider */
+.auth-divider {
+  display: flex;
+  align-items: center;
+  text-align: center;
+  margin: 18px 0 14px;
+}
+.auth-divider::before,
+.auth-divider::after {
+  content: '';
+  flex: 1;
+  border-bottom: 1px solid #e5ece4;
+}
+.auth-divider span {
+  padding: 0 10px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: #7d8f84;
+}
+
+.google-btn-zone {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.google-full-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 16px;
+  background: #fff;
+  border: 1px solid #d5ded4;
+  border-radius: 12px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: #274034;
+  cursor: pointer;
+  transition: all .16s ease;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+
+.google-full-btn:hover {
+  background: #f7faf7;
+  border-color: #b7c7b6;
+  box-shadow: 0 3px 10px rgba(0,0,0,0.07);
+}
+
+.google-subhint {
+  font-size: 10.5px;
+  color: #788a80;
+  text-align: center;
+  margin: 2px 0 0;
+  line-height: 1.4;
+}
+
+/* Distinctive Sermon Links (Side-by-side Telegram & YouTube) */
+.source {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin: 8px 0;
+}
+
+.listen-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid #cfded0;
+  border-radius: 999px;
+  padding: 4px 10px;
+  color: #1e4d3a;
+  background: #f4f8f4;
+  text-decoration: none;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.3;
+  transition: all .16s ease;
+}
+
+.listen-link:hover {
+  background: #e7f1e8;
+  border-color: #9cb89f;
+  transform: translateY(-1px);
+}
+
+.listen-link.telegram-link {
+  background: #f2f8f4;
+  border-color: #c9ded0;
+  color: #1c523c;
+}
+
+.listen-link.telegram-link:hover {
+  background: #e4f2e8;
+  border-color: #9abf9f;
+}
+
+.listen-link.youtube-link {
+  background: #fdf3f3;
+  border-color: #f7caca;
+  color: #b91c1c;
+}
+
+.listen-link.youtube-link:hover {
+  background: #fae4e4;
+  border-color: #e59797;
+}

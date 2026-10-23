@@ -20,6 +20,8 @@ import io
 from datetime import datetime, timezone
 from typing import Optional
 
+import urllib.parse
+
 from auth_and_feedback import (
     verify_admin_password,
     change_admin_password,
@@ -32,6 +34,9 @@ from auth_and_feedback import (
     delete_feedback,
     get_feedback_stats,
     authenticate_google_credential,
+    authenticate_member_email,
+    get_google_client_id,
+    set_google_client_id,
     validate_user_session,
     get_user_profile,
     add_user_bookmark,
@@ -124,21 +129,31 @@ def parse_time_seconds(time_str):
 def media_links_for(title, message_id=None, time_range=None):
     links = []
     seen_urls = set()
+    clean_title = str(title or "").strip()
     
-    # 1. ALWAYS retrieve Telegram audio links first
-    for tg_link in telegram_links_for(title, message_id):
+    # 1. Telegram Audio Link (Exact catalog link or direct Telegram channel search)
+    tg_found = False
+    for tg_link in telegram_links_for(clean_title, message_id):
         if tg_link["url"] not in seen_urls:
             seen_urls.add(tg_link["url"])
             links.append(tg_link)
+            tg_found = True
             
-    # 2. Check YouTube sermon map with strict matching
-    clean = normalize_title(title)
+    if not tg_found and clean_title:
+        safe_q = urllib.parse.quote_plus(clean_title)
+        tg_search_url = f"https://t.me/s/WeAreTDCI?q={safe_q}"
+        if tg_search_url not in seen_urls:
+            seen_urls.add(tg_search_url)
+            links.append({"url": tg_search_url, "label": "Listen on Telegram"})
+            
+    # 2. YouTube Video Link (Direct mapped video ID or direct YouTube search on Pastor Niyi's channel)
+    clean = normalize_title(clean_title)
     yt_url = None
     for k, vid in YOUTUBE_SERMON_MAP.items():
         k_norm = normalize_title(k)
         is_match = False
         if clean and k_norm:
-            if clean == k_norm or k_norm in clean:
+            if clean == k_norm or k_norm in clean or clean in k_norm:
                 is_match = True
             elif "landscape" in clean and "landscape" in k_norm:
                 for session in ["day 1", "day 2", "day 3", "thanksgiving", "grand finale", "opening", "morning", "evening"]:
@@ -150,6 +165,10 @@ def media_links_for(title, message_id=None, time_range=None):
             yt_url = f"https://www.youtube.com/watch?v={vid}" + (f"&t={sec}s" if sec > 0 else "")
             break
             
+    if not yt_url and clean_title:
+        yt_q = urllib.parse.quote_plus(f"Pastor Niyi Adetiloye {clean_title}")
+        yt_url = f"https://www.youtube.com/results?search_query={yt_q}"
+        
     if yt_url and yt_url not in seen_urls:
         seen_urls.add(yt_url)
         links.append({"url": yt_url, "label": "Watch on YouTube"})
@@ -292,6 +311,13 @@ class FeedbackSubmitRequest(BaseModel):
 
 class GoogleAuthRequest(BaseModel):
     credential: str
+
+class MemberLoginRequest(BaseModel):
+    email: str
+    name: str = ""
+
+class GoogleConfigUpdateRequest(BaseModel):
+    client_id: str
 
 class UserBookmarkRequest(BaseModel):
     title: str = Field(min_length=1, max_length=300)
@@ -846,6 +872,27 @@ def submit_feedback(payload: FeedbackSubmitRequest, request: Request):
         "id": item["id"],
         "message": "Thank you for sharing your thoughts with us. God bless you!"
     }
+
+@app.get("/api/auth/config")
+def get_auth_config():
+    return {"google_client_id": get_google_client_id()}
+
+@app.post("/api/auth/member")
+def member_login(payload: MemberLoginRequest):
+    user, token = authenticate_member_email(payload.email, payload.name)
+    if not user or not token:
+        raise HTTPException(status_code=400, detail="Please enter a valid email address.")
+    return {
+        "ok": True,
+        "user": user,
+        "token": token
+    }
+
+@app.post("/api/admin/google-client-id")
+def admin_set_google_id(payload: GoogleConfigUpdateRequest, request: Request):
+    require_admin(request)
+    set_google_client_id(payload.client_id)
+    return {"ok": True, "message": "Google Client ID updated successfully."}
 
 @app.post("/api/auth/google")
 def auth_google(payload: GoogleAuthRequest):

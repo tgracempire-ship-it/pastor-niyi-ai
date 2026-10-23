@@ -7,7 +7,7 @@
   <meta name="description" content="Explore Pastor Niyi Adetiloye’s teachings through sermon-grounded answers.">
   <title>Pastor Niyi AI</title>
   <link rel="icon" type="image/svg+xml" href="/assets/bible-favicon.svg?v=1">
-  <link rel="stylesheet" href="/web/styles.css?v=20261023e">
+  <link rel="stylesheet" href="/web/styles.css?v=20261023_v3">
   <!-- Google Identity Services for Option B Google Sign-In -->
   <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
@@ -183,7 +183,66 @@
     </div>
   </div>
 
-  <script src="/web/chat-stream.js?v=20261023e" defer></script>
-  <script src="/web/app.js?v=20261023e" defer></script>
+  <!-- MEMBER AUTHENTICATION MODAL -->
+  <div id="auth-modal" class="modal-backdrop" hidden role="dialog" aria-modal="true" aria-labelledby="auth-modal-title">
+    <div class="modal-sheet">
+      <div class="modal-sheet-header">
+        <div class="modal-title-wrap">
+          <div class="modal-gem">✦</div>
+          <div>
+            <h2 id="auth-modal-title">Member Sign In</h2>
+            <p class="modal-subtitle">Save your sermon bookmarks, notes, and study history.</p>
+          </div>
+        </div>
+        <button type="button" class="sheet-close" id="close-auth-btn" aria-label="Close modal">✕</button>
+      </div>
+
+      <div class="modal-sheet-body">
+        <form id="member-login-form" onsubmit="event.preventDefault(); window.submitMemberLogin();">
+          <div class="field-wrap">
+            <label for="member-email" class="field-label">Email Address <span class="req">*</span></label>
+            <input type="email" id="member-email" required placeholder="your.email@example.com">
+          </div>
+
+          <div class="field-wrap">
+            <label for="member-name" class="field-label">Your Name <small class="opt">(Optional)</small></label>
+            <input type="text" id="member-name" placeholder="e.g. David Emmanuel">
+            <p class="privacy-note">🔒 Passwordless access: bookmarks and sermon notes will be securely tied to your email profile.</p>
+          </div>
+
+          <div id="auth-error-alert" class="form-alert error" hidden></div>
+
+          <div class="sheet-actions" style="margin-top: 14px;">
+            <button type="button" class="sheet-btn secondary" id="cancel-auth-btn">Cancel</button>
+            <button type="submit" class="sheet-btn primary" id="member-submit-btn">
+              <span class="btn-text">Access My Account</span>
+              <span class="sheet-spinner" hidden></span>
+            </button>
+          </div>
+        </form>
+
+        <div class="auth-divider">
+          <span>OR GOOGLE SIGN-IN</span>
+        </div>
+
+        <div id="google-signin-container" class="google-btn-zone">
+          <button type="button" class="google-full-btn" id="trigger-google-oauth-btn">
+            <svg class="google-svg" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+              <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.17z"/>
+              <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"/>
+              <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.99 0 12s.45 3.82 1.25 5.42l4.03-3.15z"/>
+              <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
+            </svg>
+            <span>Continue with Google</span>
+          </button>
+          <div id="google-button-rendered" hidden></div>
+          <p id="google-hint-text" class="google-subhint">Fast 1-click Google account sync.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/web/chat-stream.js?v=20261023_v3" defer></script>
+  <script src="/web/app.js?v=20261023_v3" defer></script>
 </body>
 </html>

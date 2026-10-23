@@ -539,3 +539,63 @@ function escapeHTML(str) {
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
 }
+
+
+// --- Google OAuth Modal ---
+const googleModal = document.getElementById('google-modal');
+const googleClientIdInput = document.getElementById('google-client-id-input');
+const googleConfigMsg = document.getElementById('google-config-msg');
+const saveGoogleBtn = document.getElementById('save-google-btn');
+
+async function openGoogleOAuthModal() {
+  if (!googleModal) return;
+  googleModal.hidden = false;
+  if (googleConfigMsg) googleConfigMsg.hidden = true;
+  try {
+    const res = await fetch('/api/auth/config');
+    const data = await res.json();
+    if (googleClientIdInput && data.google_client_id) {
+      googleClientIdInput.value = data.google_client_id;
+    }
+  } catch (e) {}
+}
+
+function closeGoogleOAuthModal() {
+  if (googleModal) googleModal.hidden = true;
+}
+
+googleModal?.addEventListener('click', (e) => {
+  if (e.target === googleModal) closeGoogleOAuthModal();
+});
+
+async function handleSaveGoogleClientId() {
+  const token = getAdminToken();
+  if (!token) return showLogin();
+
+  const clientId = googleClientIdInput?.value?.trim() || '';
+  setLoading(saveGoogleBtn, true, 'Saving...');
+
+  try {
+    const res = await fetch('/api/admin/google-client-id', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ client_id: clientId })
+    });
+
+    const data = await res.json();
+    if (!res.ok || !data.ok) throw new Error(data.detail || 'Could not save client ID');
+
+    if (googleConfigMsg) {
+      googleConfigMsg.textContent = 'Google Client ID saved successfully!';
+      googleConfigMsg.hidden = false;
+    }
+    setTimeout(() => closeGoogleOAuthModal(), 1200);
+  } catch (err) {
+    alert('Error saving Client ID: ' + err.message);
+  } finally {
+    setLoading(saveGoogleBtn, false, 'Save Client ID');
+  }
+}

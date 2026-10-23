@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#0d1713">
   <title>Pastor Niyi AI · Executive Admin Console</title>
   <link rel="icon" type="image/svg+xml" href="/assets/bible-favicon.svg?v=1">
-  <link rel="stylesheet" href="/web/admin.css?v=20261023_v2">
+  <link rel="stylesheet" href="/web/admin.css?v=20261023_v3">
 </head>
 <body>
   <!-- 1. LOGIN OVERLAY -->
@@ -60,6 +60,7 @@
         <div id="default-pwd-badge" class="alert-pill warning" hidden onclick="openChangePasswordModal()" role="button" tabindex="0" title="Click to change your default password">
           ⚠️ Default password (0000) active · Change now
         </div>
+        <button type="button" class="btn secondary sm" onclick="openGoogleOAuthModal()">⚙ Google OAuth</button>
         <button type="button" class="btn secondary sm" onclick="openChangePasswordModal()">
           🔑 Change Password
         </button>
@@ -196,6 +197,29 @@
     </div>
   </div>
 
-  <script src="/web/admin.js?v=20261023_v2"></script>
+  <script src="/web/admin.js?v=20261023_v3"></script>
+  <!-- 4. GOOGLE OAUTH CONFIG MODAL -->
+  <div id="google-modal" class="modal-backdrop" hidden>
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>Google OAuth Settings</h3>
+        <button type="button" class="close-btn" onclick="closeGoogleOAuthModal()">✕</button>
+      </div>
+      <form id="google-config-form" onsubmit="event.preventDefault(); handleSaveGoogleClientId();">
+        <div class="input-group">
+          <label for="google-client-id-input">Google Cloud OAuth Client ID</label>
+          <input type="text" id="google-client-id-input" placeholder="e.g. 123456789-xyz.apps.googleusercontent.com">
+          <small class="helper-text">From <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener" style="color: var(--gold); text-decoration: underline;">Google Cloud Console</a>. Add Authorized Origin: <code>https://ai.wearetdci.org.ng</code>.</small>
+        </div>
+
+        <div id="google-config-msg" class="alert success" hidden></div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn ghost" onclick="closeGoogleOAuthModal()">Close</button>
+          <button type="submit" id="save-google-btn" class="btn primary">Save Client ID</button>
+        </div>
+      </form>
+    </div>
+  </div>
 </body>
 </html>
