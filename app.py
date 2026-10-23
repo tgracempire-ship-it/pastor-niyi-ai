@@ -28,19 +28,27 @@ CATALOG_FILE = APP_DIR / "sermon_catalog_with_urls.json"
 
 def normalize_title(title):
     plain = unicodedata.normalize("NFKD", str(title or "")).encode("ascii", "ignore").decode("ascii")
+    plain = re.sub(r"^\d+\s*[-_.]?\s*", "", plain.strip())
     plain = re.sub(r"\s+\(\d+\)$", "", plain.strip())
     return re.sub(r"[^a-z0-9]+", " ", plain.lower()).strip()
 
 def title_aliases(title):
     normalized = normalize_title(title)
     aliases = {normalized} if normalized else set()
+    no_part = re.sub(r"\s+(i|ii|iii|iv|v|1|2|3|4|5|part\s*\d+)$", "", normalized).strip()
+    if no_part:
+        aliases.add(no_part)
     for prefix in (
         "pastor niyi adetiloye",
         "niyi adetiloye",
         "visit www prayervoice org sermons to download more messages",
     ):
         if normalized.startswith(prefix + " "):
-            aliases.add(normalized[len(prefix):].strip())
+            alias = normalized[len(prefix):].strip()
+            aliases.add(alias)
+            alias_no_part = re.sub(r"\s+(i|ii|iii|iv|v|1|2|3|4|5|part\s*\d+)$", "", alias).strip()
+            if alias_no_part:
+                aliases.add(alias_no_part)
     return aliases
 
 @lru_cache(maxsize=1)
@@ -92,14 +100,39 @@ def parse_time_seconds(time_str):
     return 0
 
 def media_links_for(title, message_id=None, time_range=None):
+    links = []
+    seen_urls = set()
+    
+    # 1. ALWAYS retrieve Telegram audio links first
+    for tg_link in telegram_links_for(title, message_id):
+        if tg_link["url"] not in seen_urls:
+            seen_urls.add(tg_link["url"])
+            links.append(tg_link)
+            
+    # 2. Check YouTube sermon map with strict matching
     clean = normalize_title(title)
+    yt_url = None
     for k, vid in YOUTUBE_SERMON_MAP.items():
         k_norm = normalize_title(k)
-        if k_norm in clean or clean in k_norm or ("landscape" in clean and "landscape" in k_norm and any(d in clean and d in k_norm for d in ["day 1", "day 2", "day 3", "thanksgiving"])):
+        is_match = False
+        if clean and k_norm:
+            if clean == k_norm or k_norm in clean:
+                is_match = True
+            elif "landscape" in clean and "landscape" in k_norm:
+                for session in ["day 1", "day 2", "day 3", "thanksgiving", "grand finale", "opening", "morning", "evening"]:
+                    if session in clean and session in k_norm:
+                        is_match = True
+                        break
+        if is_match:
             sec = parse_time_seconds(time_range)
-            url = f"https://www.youtube.com/watch?v={vid}" + (f"&t={sec}s" if sec > 0 else "")
-            return [{"url": url, "label": "Watch on YouTube"}]
-    return telegram_links_for(title, message_id)
+            yt_url = f"https://www.youtube.com/watch?v={vid}" + (f"&t={sec}s" if sec > 0 else "")
+            break
+            
+    if yt_url and yt_url not in seen_urls:
+        seen_urls.add(yt_url)
+        links.append({"url": yt_url, "label": "Watch on YouTube"})
+        
+    return links
 
 def telegram_links_for(title, message_id=None):
     catalog = get_telegram_catalog()
@@ -112,12 +145,19 @@ def telegram_links_for(title, message_id=None):
                     by_url[item["url"]] = item
         matches = list(by_url.values())
     if not matches:
-        matches = catalog.get(normalize_title(title), [])
+        for alias in title_aliases(title):
+            if alias in catalog:
+                matches.extend(catalog[alias])
+                break
     pastor_matches = [item for item in matches if "niyi" in item["minister"].lower() or "adetiloye" in item["minister"].lower()]
     if pastor_matches:
         matches = pastor_matches
     links = []
+    seen = set()
     for item in matches:
+        if item["url"] in seen:
+            continue
+        seen.add(item["url"])
         date = item["date"].split(" ", 1)[0]
         label = "Listen on Telegram" if len(matches) == 1 else f"Listen on Telegram · {date}"
         links.append({"url": item["url"], "label": label})
