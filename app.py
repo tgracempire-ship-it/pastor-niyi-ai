@@ -15,6 +15,28 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
+import csv
+import io
+from datetime import datetime, timezone
+from typing import Optional
+
+from auth_and_feedback import (
+    verify_admin_password,
+    change_admin_password,
+    is_admin_default_password,
+    create_admin_session,
+    validate_admin_session,
+    add_feedback,
+    get_feedbacks,
+    update_feedback_status,
+    delete_feedback,
+    get_feedback_stats,
+    authenticate_google_credential,
+    validate_user_session,
+    get_user_profile,
+    add_user_bookmark,
+    remove_user_bookmark,
+)
 
 APP_DIR = Path(__file__).resolve().parent
 WEB_DIR = APP_DIR / "web"
@@ -250,6 +272,31 @@ class ChatTurn(BaseModel):
 class ChatRequest(BaseModel):
     message: str = Field(min_length=1, max_length=2000)
     history: list[ChatTurn] = Field(default_factory=list, max_length=12)
+
+class AdminLoginRequest(BaseModel):
+    password: str
+
+class ChangePasswordRequest(BaseModel):
+    old_password: str
+    new_password: str
+
+class FeedbackStatusRequest(BaseModel):
+    id: str
+    status: str
+
+class FeedbackSubmitRequest(BaseModel):
+    category: str = "suggestion"
+    content: str = Field(min_length=1, max_length=3000)
+    contact: str = Field(default="", max_length=200)
+    context_question: str = Field(default="", max_length=500)
+
+class GoogleAuthRequest(BaseModel):
+    credential: str
+
+class UserBookmarkRequest(BaseModel):
+    title: str = Field(min_length=1, max_length=300)
+    excerpt: str = Field(default="", max_length=500)
+    url: str = Field(default="", max_length=1000)
 
 _rate_lock = threading.Lock()
 _rate_counts = {}
@@ -678,6 +725,156 @@ def widget():
 @app.get("/widget.js")
 def widget_embed_script():
     return FileResponse(WEB_DIR / "widget-embed.js", media_type="application/javascript")
+
+@app.get("/admin")
+@app.head("/admin")
+def admin_portal():
+    return FileResponse(WEB_DIR / "admin.html")
+
+def get_admin_token(request: Request, token: Optional[str] = None) -> str:
+    if token:
+        return token
+    auth = request.headers.get("Authorization", "")
+    if auth.startswith("Bearer "):
+        return auth[7:].strip()
+    return ""
+
+def require_admin(request: Request, token: Optional[str] = None):
+    tok = get_admin_token(request, token)
+    if not tok or not validate_admin_session(tok):
+        raise HTTPException(status_code=401, detail="Invalid or expired administrator session.")
+
+def get_optional_user_id(request: Request) -> Optional[str]:
+    auth = request.headers.get("Authorization", "")
+    if auth.startswith("Bearer "):
+        tok = auth[7:].strip()
+        return validate_user_session(tok)
+    return None
+
+def require_user_id(request: Request) -> str:
+    uid = get_optional_user_id(request)
+    if not uid:
+        raise HTTPException(status_code=401, detail="Unauthorized user session.")
+    return uid
+
+@app.post("/api/admin/login")
+def admin_login(payload: AdminLoginRequest):
+    if not verify_admin_password(payload.password):
+        raise HTTPException(status_code=401, detail="Incorrect password. Default is 0000.")
+    token = create_admin_session()
+    return {
+        "ok": True,
+        "token": token,
+        "is_default": is_admin_default_password()
+    }
+
+@app.post("/api/admin/change-password")
+def admin_change_pwd(payload: ChangePasswordRequest, request: Request):
+    require_admin(request)
+    success, msg = change_admin_password(payload.old_password, payload.new_password)
+    if not success:
+        raise HTTPException(status_code=400, detail=msg)
+    return {"ok": True, "message": msg}
+
+@app.get("/api/admin/feedbacks")
+def admin_get_feedbacks(request: Request, status: str = "all", category: str = "all", search: str = ""):
+    require_admin(request)
+    feedbacks = get_feedbacks(status_filter=status, category_filter=category, search=search)
+    stats = get_feedback_stats()
+    return {
+        "ok": True,
+        "feedbacks": feedbacks,
+        "stats": stats,
+        "is_default_password": is_admin_default_password()
+    }
+
+@app.post("/api/admin/feedbacks/status")
+def admin_update_feedback_status(payload: FeedbackStatusRequest, request: Request):
+    require_admin(request)
+    ok = update_feedback_status(payload.id, payload.status)
+    if not ok:
+        raise HTTPException(status_code=400, detail="Could not update feedback status.")
+    return {"ok": True}
+
+@app.delete("/api/admin/feedbacks/{feedback_id}")
+def admin_delete_feedback(feedback_id: str, request: Request):
+    require_admin(request)
+    ok = delete_feedback(feedback_id)
+    if not ok:
+        raise HTTPException(status_code=404, detail="Feedback item not found.")
+    return {"ok": True}
+
+@app.get("/api/admin/feedbacks/export")
+def admin_export_feedbacks(request: Request, token: Optional[str] = None):
+    require_admin(request, token=token)
+    feedbacks = get_feedbacks()
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["ID", "Category", "Status", "Date (UTC)", "Feedback Text", "Contact Info", "Context Query", "User ID"])
+    for fb in feedbacks:
+        writer.writerow([
+            fb.get("id", ""),
+            fb.get("category", ""),
+            fb.get("status", ""),
+            fb.get("created_at", ""),
+            fb.get("content", ""),
+            fb.get("contact", ""),
+            fb.get("context_question", ""),
+            fb.get("user_id", "") or ""
+        ])
+    filename = f"pastor_niyi_feedbacks_{datetime.now(timezone.utc).strftime('%Y%m%d')}.csv"
+    return Response(
+        content=output.getvalue(),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
+@app.post("/api/feedback")
+def submit_feedback(payload: FeedbackSubmitRequest, request: Request):
+    user_id = get_optional_user_id(request)
+    item = add_feedback(
+        category=payload.category,
+        content=payload.content,
+        contact=payload.contact,
+        context_question=payload.context_question,
+        user_id=user_id
+    )
+    return {
+        "ok": True,
+        "id": item["id"],
+        "message": "Thank you for sharing your thoughts with us. God bless you!"
+    }
+
+@app.post("/api/auth/google")
+def auth_google(payload: GoogleAuthRequest):
+    user, token = authenticate_google_credential(payload.credential)
+    if not user or not token:
+        raise HTTPException(status_code=400, detail="Unable to authenticate Google account.")
+    return {
+        "ok": True,
+        "user": user,
+        "token": token
+    }
+
+@app.get("/api/auth/me")
+def auth_me(request: Request):
+    user_id = require_user_id(request)
+    user = get_user_profile(user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found.")
+    return {"ok": True, "user": user}
+
+@app.post("/api/user/bookmarks")
+def add_bookmark(payload: UserBookmarkRequest, request: Request):
+    user_id = require_user_id(request)
+    bookmarks = add_user_bookmark(user_id, payload.title, payload.excerpt, payload.url)
+    return {"ok": True, "bookmarks": bookmarks}
+
+@app.delete("/api/user/bookmarks/{bookmark_id}")
+def delete_bookmark(bookmark_id: str, request: Request):
+    user_id = require_user_id(request)
+    bookmarks = remove_user_bookmark(user_id, bookmark_id)
+    return {"ok": True, "bookmarks": bookmarks}
 
 def sse_event(name, payload):
     data = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))

@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#0d1713">
+  <title>Pastor Niyi AI · Executive Admin Console</title>
+  <link rel="icon" type="image/svg+xml" href="/assets/bible-favicon.svg?v=1">
+  <link rel="stylesheet" href="/web/admin.css?v=20261023">
+</head>
+<body>
+  <!-- 1. LOGIN OVERLAY -->
+  <div id="login-view" class="auth-wrapper">
+    <div class="auth-card">
+      <div class="auth-badge">
+        <span class="auth-icon">✦</span>
+        <span>PASTOR NIYI AI</span>
+      </div>
+      <h2>Executive Admin Portal</h2>
+      <p class="auth-sub">Enter the administrator key to access church suggestions, feedback, and system controls.</p>
+
+      <form id="admin-login-form" class="auth-form" onsubmit="event.preventDefault(); handleAdminLogin();">
+        <div class="input-group">
+          <label for="admin-password">Console Password</label>
+          <div class="password-field">
+            <input type="password" id="admin-password" placeholder="Enter password (default: 0000)" required autocomplete="current-password" autofocus>
+            <button type="button" class="toggle-eye" onclick="togglePasswordVisibility('admin-password', this)" title="Show/Hide">👁</button>
+          </div>
+          <small class="helper-text">Default password is <code>0000</code>. You can change it once logged in.</small>
+        </div>
+
+        <div id="login-error" class="alert error" hidden></div>
+
+        <button type="submit" id="login-btn" class="btn primary full">
+          <span class="btn-text">Authenticate & Enter</span>
+          <span class="spinner" hidden></span>
+        </button>
+      </form>
+      <div class="auth-footer">
+        <a href="/" class="back-link">← Return to Public Chat</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. MAIN DASHBOARD VIEW (Shown when authenticated) -->
+  <div id="dashboard-view" class="admin-shell" hidden>
+    <!-- TOP HEADER -->
+    <header class="admin-header">
+      <div class="header-brand">
+        <a href="/" class="brand-link" title="Open Main Chat">
+          <span class="brand-gem">✦</span>
+          <div>
+            <strong>PASTOR NIYI AI</strong>
+            <small>CHURCH FEEDBACK & SUGGESTIONS</small>
+          </div>
+        </a>
+      </div>
+
+      <div class="header-actions">
+        <div id="default-pwd-badge" class="alert-pill warning" hidden onclick="openChangePasswordModal()" role="button" tabindex="0" title="Click to change your default password">
+          ⚠️ Default password (0000) active · Change now
+        </div>
+        <button type="button" class="btn secondary sm" onclick="openChangePasswordModal()">
+          🔑 Change Password
+        </button>
+        <button type="button" class="btn ghost sm" onclick="handleAdminLogout()">
+          Sign Out
+        </button>
+      </div>
+    </header>
+
+    <!-- METRICS RIBBON -->
+    <section class="kpi-grid">
+      <div class="kpi-card">
+        <div class="kpi-meta">
+          <span class="kpi-title">TOTAL SUBMISSIONS</span>
+          <span class="kpi-icon">📬</span>
+        </div>
+        <div class="kpi-value" id="kpi-total">0</div>
+        <div class="kpi-sub">Lifetime suggestions & reports</div>
+      </div>
+
+      <div class="kpi-card highlight">
+        <div class="kpi-meta">
+          <span class="kpi-title">UNREVIEWED / NEW</span>
+          <span class="kpi-icon">✨</span>
+        </div>
+        <div class="kpi-value" id="kpi-new">0</div>
+        <div class="kpi-sub">Awaiting pastoral review</div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-meta">
+          <span class="kpi-title">FEATURE IDEAS</span>
+          <span class="kpi-icon">💡</span>
+        </div>
+        <div class="kpi-value" id="kpi-suggestions">0</div>
+        <div class="kpi-sub">Member recommendations</div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-meta">
+          <span class="kpi-title">SERMON QUERIES</span>
+          <span class="kpi-icon">📖</span>
+        </div>
+        <div class="kpi-value" id="kpi-sermons">0</div>
+        <div class="kpi-sub">Doctrine & teaching notes</div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-meta">
+          <span class="kpi-title">BUG REPORTS</span>
+          <span class="kpi-icon">🐛</span>
+        </div>
+        <div class="kpi-value" id="kpi-bugs">0</div>
+        <div class="kpi-sub">App or UI feedback</div>
+      </div>
+    </section>
+
+    <!-- CONTROLS & FILTER BAR -->
+    <section class="toolbar">
+      <div class="category-tabs" id="category-tabs">
+        <button type="button" class="tab active" data-cat="all">All Feedback</button>
+        <button type="button" class="tab" data-cat="suggestion">💡 Suggestions</button>
+        <button type="button" class="tab" data-cat="sermon">📖 Sermon Accuracy</button>
+        <button type="button" class="tab" data-cat="bug">🐛 Bugs & Glitches</button>
+        <button type="button" class="tab" data-cat="testimony">❤️ Testimonies</button>
+      </div>
+
+      <div class="toolbar-right">
+        <div class="search-box">
+          <span class="search-icon">🔍</span>
+          <input type="search" id="search-input" placeholder="Search feedback text, contact..." oninput="handleSearchInput(this.value)">
+        </div>
+
+        <select id="status-filter" class="select-filter" onchange="loadFeedbacks()">
+          <option value="all">All Statuses</option>
+          <option value="new" selected>New Only</option>
+          <option value="reviewed">Reviewed</option>
+          <option value="starred">Starred ⭐</option>
+          <option value="archived">Archived</option>
+        </select>
+
+        <button type="button" class="btn secondary sm" onclick="exportFeedbacksCSV()" title="Download CSV">
+          ⬇ Export CSV
+        </button>
+      </div>
+    </section>
+
+    <!-- FEEDBACK CARDS LIST -->
+    <main class="feedbacks-container">
+      <div id="loading-state" class="state-card" hidden>
+        <div class="spinner lg"></div>
+        <p>Loading suggestions...</p>
+      </div>
+
+      <div id="empty-state" class="state-card" hidden>
+        <span class="empty-icon">📭</span>
+        <h3>No feedback found</h3>
+        <p>There are no suggestions matching your current filter.</p>
+      </div>
+
+      <div id="feedbacks-list" class="feedbacks-grid"></div>
+    </main>
+  </div>
+
+  <!-- 3. CHANGE PASSWORD MODAL -->
+  <div id="pwd-modal" class="modal-backdrop" hidden>
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>Change Admin Password</h3>
+        <button type="button" class="close-btn" onclick="closeChangePasswordModal()">✕</button>
+      </div>
+      <form id="change-pwd-form" onsubmit="event.preventDefault(); handleChangePassword();">
+        <div class="input-group">
+          <label for="old-pwd">Current Password</label>
+          <input type="password" id="old-pwd" required placeholder="Default is 0000">
+        </div>
+        <div class="input-group">
+          <label for="new-pwd">New Password</label>
+          <input type="password" id="new-pwd" required minlength="4" placeholder="Enter new secret password">
+        </div>
+        <div class="input-group">
+          <label for="confirm-pwd">Confirm New Password</label>
+          <input type="password" id="confirm-pwd" required minlength="4" placeholder="Repeat new password">
+        </div>
+
+        <div id="change-pwd-error" class="alert error" hidden></div>
+        <div id="change-pwd-success" class="alert success" hidden></div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn ghost" onclick="closeChangePasswordModal()">Cancel</button>
+          <button type="submit" id="save-pwd-btn" class="btn primary">Update Password</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="/web/admin.js?v=20261023"></script>
+</body>
+</html>

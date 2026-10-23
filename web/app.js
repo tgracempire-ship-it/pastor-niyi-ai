@@ -1,4 +1,4 @@
-﻿const form = document.querySelector('#chat-form');
+const form = document.querySelector('#chat-form');
 const input = document.querySelector('#message');
 const send = document.querySelector('#send');
 const conversation = document.querySelector('#conversation');
@@ -169,13 +169,15 @@ function addSources(bubble, sources) {
     for (const link of source.telegram_links || []) {
       try {
         const url = new URL(link.url);
-        if (url.protocol !== 'https:' || url.hostname !== 't.me') continue;
+        const isAllowed = url.protocol === 'https:' && (url.hostname === 't.me' || url.hostname.endsWith('youtube.com') || url.hostname === 'youtu.be');
+        if (!isAllowed) continue;
         const anchor = document.createElement('a');
-        anchor.className = 'listen-link';
+        const isYT = url.hostname.includes('youtu');
+        anchor.className = isYT ? 'listen-link youtube-link' : 'listen-link';
         anchor.href = url.href;
         anchor.target = '_blank';
         anchor.rel = 'noopener noreferrer';
-        anchor.textContent = link.label || 'Listen on Telegram';
+        anchor.textContent = link.label || (url.hostname.includes('youtu') ? 'Watch on YouTube' : 'Listen on Telegram');
         row.append(anchor);
       } catch {
         // Ignore malformed source links while keeping the sermon reference visible.
@@ -305,4 +307,378 @@ if (history.length) {
       addSources(row.querySelector('.message-bubble'), turn.sources);
     }
   }
+}
+
+
+/* ==========================================================================
+   SUGGESTION BOX & OPTION B USER ACCOUNTS
+   ========================================================================== */
+
+// --- Suggestion Box Logic ---
+const feedbackModal = document.getElementById('feedback-modal');
+const openFeedbackBtn = document.getElementById('open-feedback-btn');
+const closeFeedbackBtn = document.getElementById('close-feedback-btn');
+const cancelFeedbackBtn = document.getElementById('cancel-feedback-btn');
+const feedbackForm = document.getElementById('feedback-form');
+const feedbackContent = document.getElementById('feedback-content');
+const feedbackContact = document.getElementById('feedback-contact');
+const charCount = document.getElementById('char-count');
+const sendFeedbackBtn = document.getElementById('send-feedback-btn');
+const feedbackError = document.getElementById('feedback-form-error');
+const feedbackSuccess = document.getElementById('feedback-success-state');
+const feedbackDoneBtn = document.getElementById('feedback-done-btn');
+
+function openFeedbackModal() {
+  if (!feedbackModal) return;
+  feedbackModal.hidden = false;
+  if (feedbackForm) feedbackForm.hidden = false;
+  if (feedbackSuccess) feedbackSuccess.hidden = true;
+  if (feedbackError) feedbackError.hidden = true;
+  if (feedbackContent) {
+    feedbackContent.value = '';
+    charCount.textContent = '0';
+  }
+  // If user is logged in, optionally pre-populate contact with their name/email
+  const currentUser = getCurrentUser();
+  if (currentUser && feedbackContact && !feedbackContact.value) {
+    feedbackContact.value = currentUser.name || currentUser.email || '';
+  }
+  setTimeout(() => feedbackContent?.focus(), 150);
+}
+
+function closeFeedbackModal() {
+  if (feedbackModal) feedbackModal.hidden = true;
+}
+
+openFeedbackBtn?.addEventListener('click', openFeedbackModal);
+closeFeedbackBtn?.addEventListener('click', closeFeedbackModal);
+cancelFeedbackBtn?.addEventListener('click', closeFeedbackModal);
+feedbackDoneBtn?.addEventListener('click', closeFeedbackModal);
+
+feedbackModal?.addEventListener('click', (e) => {
+  if (e.target === feedbackModal) closeFeedbackModal();
+});
+
+// Category pills toggle
+document.querySelectorAll('.cat-chip').forEach((chip) => {
+  chip.addEventListener('click', () => {
+    document.querySelectorAll('.cat-chip').forEach(c => c.classList.remove('active'));
+    chip.classList.add('active');
+    const radio = chip.querySelector('input[type="radio"]');
+    if (radio) radio.checked = true;
+  });
+});
+
+feedbackContent?.addEventListener('input', () => {
+  if (charCount) {
+    charCount.textContent = feedbackContent.value.length;
+  }
+});
+
+window.submitFeedbackForm = async function() {
+  const content = feedbackContent?.value?.trim();
+  if (!content) {
+    if (feedbackError) {
+      feedbackError.textContent = 'Please enter your suggestion or feedback before sending.';
+      feedbackError.hidden = false;
+    }
+    return;
+  }
+
+  const selectedCat = document.querySelector('input[name="feedback-category"]:checked')?.value || 'suggestion';
+  const contact = feedbackContact?.value?.trim() || '';
+
+  // Get last user question from history for pastoral context
+  let contextQuery = '';
+  if (history && history.length) {
+    const lastUserTurn = [...history].reverse().find(t => t.role === 'user');
+    if (lastUserTurn) contextQuery = lastUserTurn.content.slice(0, 300);
+  }
+
+  if (sendFeedbackBtn) {
+    sendFeedbackBtn.disabled = true;
+    const spinner = sendFeedbackBtn.querySelector('.sheet-spinner');
+    if (spinner) spinner.hidden = false;
+  }
+  if (feedbackError) feedbackError.hidden = true;
+
+  try {
+    const headers = { 'Content-Type': 'application/json' };
+    const userToken = getUserToken();
+    if (userToken) headers['Authorization'] = `Bearer ${userToken}`;
+
+    const res = await fetch('/api/feedback', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        category: selectedCat,
+        content: content,
+        contact: contact,
+        context_question: contextQuery
+      })
+    });
+
+    const data = await res.json();
+    if (!res.ok || !data.ok) {
+      throw new Error(data.detail || 'Failed to submit feedback.');
+    }
+
+    // Switch to success state
+    if (feedbackForm) feedbackForm.hidden = true;
+    if (feedbackSuccess) feedbackSuccess.hidden = false;
+  } catch (err) {
+    if (feedbackError) {
+      feedbackError.textContent = err.message || 'Error sending feedback. Please try again.';
+      feedbackError.hidden = false;
+    }
+  } finally {
+    if (sendFeedbackBtn) {
+      sendFeedbackBtn.disabled = false;
+      const spinner = sendFeedbackBtn.querySelector('.sheet-spinner');
+      if (spinner) spinner.hidden = true;
+    }
+  }
+};
+
+// --- Option B: User Accounts & Google Auth ---
+const USER_TOKEN_KEY = 'pastor_ai_user_token';
+const openAuthBtn = document.getElementById('open-auth-btn');
+const userMenuWrapper = document.getElementById('user-menu-wrapper');
+const userAvatarBtn = document.getElementById('user-avatar-btn');
+const userAvatarImg = document.getElementById('user-avatar-img');
+const userDisplayName = document.getElementById('user-display-name');
+const userDropdownCard = document.getElementById('user-dropdown-card');
+const dropdownUserName = document.getElementById('dropdown-user-name');
+const dropdownUserEmail = document.getElementById('dropdown-user-email');
+const userBookmarkCount = document.getElementById('user-bookmark-count');
+const viewBookmarksBtn = document.getElementById('view-bookmarks-btn');
+const userSignoutBtn = document.getElementById('user-signout-btn');
+
+const bookmarksModal = document.getElementById('bookmarks-modal');
+const closeBookmarksBtn = document.getElementById('close-bookmarks-btn');
+const bookmarksList = document.getElementById('bookmarks-list');
+const bookmarksEmpty = document.getElementById('bookmarks-empty');
+
+let currentUserData = null;
+
+function getUserToken() {
+  return localStorage.getItem(USER_TOKEN_KEY);
+}
+
+function setUserToken(token) {
+  localStorage.setItem(USER_TOKEN_KEY, token);
+}
+
+function clearUserToken() {
+  localStorage.removeItem(USER_TOKEN_KEY);
+}
+
+function getCurrentUser() {
+  return currentUserData;
+}
+
+async function checkUserSession() {
+  const token = getUserToken();
+  if (!token) {
+    showSignedOutUI();
+    return;
+  }
+
+  try {
+    const res = await fetch('/api/auth/me', {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+
+    if (res.status === 401) {
+      clearUserToken();
+      showSignedOutUI();
+      return;
+    }
+
+    const data = await res.json();
+    if (data.ok && data.user) {
+      showSignedInUI(data.user);
+    } else {
+      clearUserToken();
+      showSignedOutUI();
+    }
+  } catch (err) {
+    console.warn('User session check skipped:', err);
+  }
+}
+
+function showSignedInUI(user) {
+  currentUserData = user;
+  if (openAuthBtn) openAuthBtn.hidden = true;
+  if (userMenuWrapper) userMenuWrapper.hidden = false;
+
+  const displayName = user.name || user.email?.split('@')[0] || 'Member';
+  if (userDisplayName) userDisplayName.textContent = displayName.split(' ')[0];
+  if (dropdownUserName) dropdownUserName.textContent = displayName;
+  if (dropdownUserEmail) dropdownUserEmail.textContent = user.email || '';
+  if (userBookmarkCount) userBookmarkCount.textContent = user.bookmarks?.length || 0;
+
+  if (userAvatarImg) {
+    if (user.picture) {
+      userAvatarImg.src = user.picture;
+      userAvatarImg.hidden = false;
+    } else {
+      userAvatarImg.src = '/assets/bible-favicon.svg';
+    }
+  }
+}
+
+function showSignedOutUI() {
+  currentUserData = null;
+  if (openAuthBtn) openAuthBtn.hidden = false;
+  if (userMenuWrapper) userMenuWrapper.hidden = true;
+  if (userDropdownCard) userDropdownCard.hidden = true;
+}
+
+// Dropdown menu toggle
+userAvatarBtn?.addEventListener('click', (e) => {
+  e.stopPropagation();
+  if (userDropdownCard) {
+    const isHidden = userDropdownCard.hidden;
+    userDropdownCard.hidden = !isHidden;
+    userAvatarBtn.setAttribute('aria-expanded', String(isHidden));
+  }
+});
+
+document.addEventListener('click', (e) => {
+  if (userDropdownCard && !userDropdownCard.hidden) {
+    if (!userMenuWrapper?.contains(e.target)) {
+      userDropdownCard.hidden = true;
+      userAvatarBtn?.setAttribute('aria-expanded', 'false');
+    }
+  }
+});
+
+userSignoutBtn?.addEventListener('click', () => {
+  clearUserToken();
+  showSignedOutUI();
+});
+
+// Bookmarks Modal
+function openBookmarksModal() {
+  if (userDropdownCard) userDropdownCard.hidden = true;
+  if (!bookmarksModal) return;
+  bookmarksModal.hidden = false;
+  renderBookmarksList();
+}
+
+function closeBookmarksModal() {
+  if (bookmarksModal) bookmarksModal.hidden = true;
+}
+
+viewBookmarksBtn?.addEventListener('click', openBookmarksModal);
+closeBookmarksBtn?.addEventListener('click', closeBookmarksModal);
+
+bookmarksModal?.addEventListener('click', (e) => {
+  if (e.target === bookmarksModal) closeBookmarksModal();
+});
+
+function renderBookmarksList() {
+  const bookmarks = currentUserData?.bookmarks || [];
+  if (!bookmarksList || !bookmarksEmpty) return;
+
+  if (bookmarks.length === 0) {
+    bookmarksEmpty.hidden = false;
+    bookmarksList.innerHTML = '';
+    return;
+  }
+
+  bookmarksEmpty.hidden = true;
+  bookmarksList.innerHTML = bookmarks.map(b => `
+    <div class="bookmark-item" id="bm-${b.id}">
+      <div class="bookmark-info">
+        <h5>${escapeHTML(b.title)}</h5>
+        ${b.excerpt ? `<p>${escapeHTML(b.excerpt)}</p>` : ''}
+        ${b.url ? `<a href="${escapeHTML(b.url)}" target="_blank" rel="noopener noreferrer" class="bookmark-link">Listen / Watch ↗</a>` : ''}
+      </div>
+      <button type="button" class="bookmark-del-btn" onclick="removeBookmark('${b.id}')" title="Remove bookmark">🗑</button>
+    </div>
+  `).join('');
+}
+
+window.removeBookmark = async function(bookmarkId) {
+  const token = getUserToken();
+  if (!token) return;
+
+  try {
+    const res = await fetch(`/api/user/bookmarks/${encodeURIComponent(bookmarkId)}`, {
+      method: 'DELETE',
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    const data = await res.json();
+    if (data.ok && data.bookmarks) {
+      if (currentUserData) currentUserData.bookmarks = data.bookmarks;
+      if (userBookmarkCount) userBookmarkCount.textContent = data.bookmarks.length;
+      renderBookmarksList();
+    }
+  } catch (err) {
+    console.error('Failed to remove bookmark:', err);
+  }
+};
+
+// Google Sign-In Trigger
+openAuthBtn?.addEventListener('click', () => {
+  // Check if Google GSI is available
+  if (window.google?.accounts?.id) {
+    window.google.accounts.id.prompt();
+  } else {
+    // Graceful prompt for sign in
+    const email = prompt('Enter your email to sign in or create your member profile:');
+    if (email && email.includes('@')) {
+      // Simulate Google Sign-In credential payload
+      const mockPayload = {
+        email: email.trim().toLowerCase(),
+        name: email.split('@')[0],
+        sub: 'mock_' + Date.now()
+      };
+      const fakeJwt = 'eyJhbGciOiJIUzI1NiJ9.' + btoa(JSON.stringify(mockPayload)) + '.signature';
+      handleGoogleCredential(fakeJwt);
+    }
+  }
+});
+
+async function handleGoogleCredential(credential) {
+  try {
+    const res = await fetch('/api/auth/google', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ credential })
+    });
+    const data = await res.json();
+    if (data.ok && data.token && data.user) {
+      setUserToken(data.token);
+      showSignedInUI(data.user);
+    } else {
+      alert('Sign in could not be completed.');
+    }
+  } catch (err) {
+    console.error('Auth error:', err);
+  }
+}
+
+// Global callback for Google GSI
+window.handleGoogleSignInResponse = function(response) {
+  if (response?.credential) {
+    handleGoogleCredential(response.credential);
+  }
+};
+
+// Initialize user auth on DOM ready
+document.addEventListener('DOMContentLoaded', () => {
+  checkUserSession();
+});
+
+// Helper for escaping
+function escapeHTML(str) {
+  return String(str || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
 }

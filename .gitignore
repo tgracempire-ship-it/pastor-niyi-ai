@@ -5,3 +5,6 @@ sermon_vector_db/
 *.zip
 _temp_*
 api_key.txt
+data/*.json
+test_*.py
+scratch/

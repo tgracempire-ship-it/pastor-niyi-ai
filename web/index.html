@@ -1,5 +1,189 @@
-﻿<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#f8f7f2"><meta name="description" content="Explore Pastor Niyi Adetiloye’s teachings through sermon-grounded answers."><title>Pastor Niyi AI</title><link rel="icon" type="image/svg+xml" href="/assets/bible-favicon.svg?v=1"><link rel="stylesheet" href="/web/styles.css"></head>
-<body><main class="shell"><header class="topbar"><a class="brand" href="/" aria-label="Pastor Niyi AI home"><span class="brand-mark">✦</span><span><strong>PASTOR NIYI AI</strong><small>ASK ANYTHING</small></span></a><div class="online"><i></i> Grounded in sermons</div></header>
-<section class="welcome" id="welcome"><div class="portrait-wrap"><img src="/assets/pastor_niyi.webp" alt="Pastor Niyi Adetiloye" class="portrait"><span class="portrait-spark">✦</span></div><h1>What would you like<br><em>to understand today?</em></h1><p class="intro">Explore biblical wisdom and teachings from Pastor Niyi Adetiloye’s messages.</p><div class="suggestions" aria-label="Suggested questions"><button class="suggestion" data-prompt="What does the Bible teach about growing in faith?">Growing in faith <span>↗</span></button><button class="suggestion" data-prompt="How can I trust God in a difficult season?">Trusting God <span>↗</span></button><button class="suggestion" data-prompt="What are practical ways to build a life of prayer?">A life of prayer <span>↗</span></button></div></section>
-<section id="conversation" class="conversation" aria-live="polite" aria-label="Conversation"></section><div id="error" class="error" role="status" hidden></div><form id="chat-form" class="composer"><label class="sr-only" for="message">Ask a question</label><textarea id="message" rows="1" maxlength="2000" placeholder="Ask a question about faith, life, or the sermons…" required></textarea><button id="send" type="submit" aria-label="Send question"><span>↑</span></button><div class="composer-note">AI can make mistakes. Check scripture and seek trusted pastoral counsel.</div></form></main><script src="/web/chat-stream.js" defer></script><script src="/web/app.js" defer></script></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#f8f7f2">
+  <meta name="description" content="Explore Pastor Niyi Adetiloye’s teachings through sermon-grounded answers.">
+  <title>Pastor Niyi AI</title>
+  <link rel="icon" type="image/svg+xml" href="/assets/bible-favicon.svg?v=1">
+  <link rel="stylesheet" href="/web/styles.css?v=20261023e">
+  <!-- Google Identity Services for Option B Google Sign-In -->
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <a class="brand" href="/" aria-label="Pastor Niyi AI home">
+        <span class="brand-mark">✦</span>
+        <span><strong>PASTOR NIYI AI</strong><small>ASK ANYTHING</small></span>
+      </a>
+
+      <div class="topbar-actions">
+        <div class="online"><i></i> <span>Grounded in sermons</span></div>
+
+        <!-- Suggestion Box Trigger Button -->
+        <button type="button" class="topbar-pill-btn" id="open-feedback-btn" aria-haspopup="dialog" aria-expanded="false" title="Submit feedback or suggestion">
+          <span class="pill-icon">💡</span>
+          <span class="pill-text">Suggestion Box</span>
+        </button>
+
+        <!-- User Profile / Google Sign-In Container (Option B) -->
+        <div class="user-auth-zone" id="user-auth-zone">
+          <button type="button" class="topbar-pill-btn auth-signin-btn" id="open-auth-btn" title="Sign in with Google">
+            <svg class="google-svg" viewBox="0 0 24 24" width="13" height="13" aria-hidden="true">
+              <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.17z"/>
+              <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"/>
+              <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.99 0 12s.45 3.82 1.25 5.42l4.03-3.15z"/>
+              <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
+            </svg>
+            <span class="pill-text">Sign In</span>
+          </button>
+
+          <div class="user-menu-wrapper" id="user-menu-wrapper" hidden>
+            <button type="button" class="user-avatar-btn" id="user-avatar-btn" aria-haspopup="menu" aria-expanded="false" title="Account profile">
+              <img id="user-avatar-img" class="user-avatar" src="" alt="User avatar">
+              <span id="user-display-name" class="user-name"></span>
+              <span class="user-caret">▾</span>
+            </button>
+            <div class="user-dropdown-card" id="user-dropdown-card" hidden role="menu">
+              <div class="dropdown-user-info">
+                <strong id="dropdown-user-name"></strong>
+                <small id="dropdown-user-email"></small>
+              </div>
+              <div class="dropdown-line"></div>
+              <button type="button" class="dropdown-row-btn" id="view-bookmarks-btn" role="menuitem">
+                🔖 Saved Bookmarks (<span id="user-bookmark-count">0</span>)
+              </button>
+              <div class="dropdown-line"></div>
+              <button type="button" class="dropdown-row-btn signout" id="user-signout-btn" role="menuitem">
+                Sign Out
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <section class="welcome" id="welcome">
+      <div class="portrait-wrap">
+        <img src="/assets/pastor_niyi.webp" alt="Pastor Niyi Adetiloye" class="portrait">
+        <span class="portrait-spark">✦</span>
+      </div>
+      <h1>What would you like<br><em>to understand today?</em></h1>
+      <p class="intro">Explore biblical wisdom and teachings from Pastor Niyi Adetiloye’s messages.</p>
+      <div class="suggestions" aria-label="Suggested questions">
+        <button class="suggestion" data-prompt="What does the Bible teach about growing in faith?">Growing in faith <span>↗</span></button>
+        <button class="suggestion" data-prompt="How can I trust God in a difficult season?">Trusting God <span>↗</span></button>
+        <button class="suggestion" data-prompt="What are practical ways to build a life of prayer?">A life of prayer <span>↗</span></button>
+      </div>
+    </section>
+
+    <section id="conversation" class="conversation" aria-live="polite" aria-label="Conversation"></section>
+    <div id="error" class="error" role="status" hidden></div>
+
+    <form id="chat-form" class="composer">
+      <label class="sr-only" for="message">Ask a question</label>
+      <textarea id="message" rows="1" maxlength="2000" placeholder="Ask a question about faith, life, or the sermons…" required></textarea>
+      <button id="send" type="submit" aria-label="Send question"><span>↑</span></button>
+      <div class="composer-note">AI can make mistakes. Check scripture and seek trusted pastoral counsel.</div>
+    </form>
+  </main>
+
+  <!-- SUGGESTION & FEEDBACK MODAL -->
+  <div id="feedback-modal" class="modal-backdrop" hidden role="dialog" aria-modal="true" aria-labelledby="feedback-title">
+    <div class="modal-sheet">
+      <div class="modal-sheet-header">
+        <div class="modal-title-wrap">
+          <div class="modal-gem">💡</div>
+          <div>
+            <h2 id="feedback-title">Suggestion & Feedback Box</h2>
+            <p class="modal-subtitle">Share your ideas, report errors, or leave a note for the church team.</p>
+          </div>
+        </div>
+        <button type="button" class="sheet-close" id="close-feedback-btn" aria-label="Close modal">✕</button>
+      </div>
+
+      <div class="modal-sheet-body">
+        <form id="feedback-form" onsubmit="event.preventDefault(); window.submitFeedbackForm();">
+          <div class="category-radio-group" role="radiogroup" aria-label="Feedback category">
+            <label class="cat-chip active">
+              <input type="radio" name="feedback-category" value="suggestion" checked>
+              <span>💡 Suggestion</span>
+            </label>
+            <label class="cat-chip">
+              <input type="radio" name="feedback-category" value="sermon">
+              <span>📖 Sermon Note</span>
+            </label>
+            <label class="cat-chip">
+              <input type="radio" name="feedback-category" value="bug">
+              <span>🐛 Bug / Issue</span>
+            </label>
+            <label class="cat-chip">
+              <input type="radio" name="feedback-category" value="testimony">
+              <span>❤️ Testimony</span>
+            </label>
+          </div>
+
+          <div class="field-wrap">
+            <label for="feedback-content" class="field-label">Your Message or Suggestion <span class="req">*</span></label>
+            <textarea id="feedback-content" rows="4" maxlength="3000" placeholder="Write your thoughts, suggestions, or corrections here…" required></textarea>
+            <div class="char-indicator"><span id="char-count">0</span> / 3000</div>
+          </div>
+
+          <div class="field-wrap">
+            <label for="feedback-contact" class="field-label">Name or Contact <small class="opt">(Optional — leave blank for 100% anonymous)</small></label>
+            <input type="text" id="feedback-contact" maxlength="150" placeholder="e.g. Bro David or david@example.com">
+            <p class="privacy-note">🔒 Submissions are 100% anonymous by default. You only need to provide contact info if you would like pastoral follow-up.</p>
+          </div>
+
+          <div id="feedback-form-error" class="form-alert error" hidden></div>
+
+          <div class="sheet-actions">
+            <button type="button" class="sheet-btn secondary" id="cancel-feedback-btn">Cancel</button>
+            <button type="submit" class="sheet-btn primary" id="send-feedback-btn">
+              <span class="btn-text">Send to Pastoral Team</span>
+              <span class="sheet-spinner" hidden></span>
+            </button>
+          </div>
+        </form>
+
+        <div id="feedback-success-state" class="modal-success-state" hidden>
+          <div class="success-gem">🕊️</div>
+          <h3>Thank You!</h3>
+          <p>Your thoughts have been received with love and appreciation. May God continually bless and keep you!</p>
+          <button type="button" class="sheet-btn primary" id="feedback-done-btn">Back to Chat</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SAVED BOOKMARKS MODAL (OPTION B) -->
+  <div id="bookmarks-modal" class="modal-backdrop" hidden role="dialog" aria-modal="true" aria-labelledby="bookmarks-title">
+    <div class="modal-sheet">
+      <div class="modal-sheet-header">
+        <div class="modal-title-wrap">
+          <div class="modal-gem">🔖</div>
+          <div>
+            <h2 id="bookmarks-title">Saved Sermons & Messages</h2>
+            <p class="modal-subtitle">Teachings and sermon links saved to your account.</p>
+          </div>
+        </div>
+        <button type="button" class="sheet-close" id="close-bookmarks-btn" aria-label="Close modal">✕</button>
+      </div>
+
+      <div class="modal-sheet-body">
+        <div id="bookmarks-empty" class="bookmarks-empty-state" hidden>
+          <span class="empty-icon">📭</span>
+          <h4>No saved sermons yet</h4>
+          <p>When listening to or reading sermon answers, click "Save" to keep them handy here.</p>
+        </div>
+        <div id="bookmarks-list" class="bookmarks-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/web/chat-stream.js?v=20261023e" defer></script>
+  <script src="/web/app.js?v=20261023e" defer></script>
+</body>
+</html>

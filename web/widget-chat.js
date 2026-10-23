@@ -117,13 +117,15 @@ function addSources(bubble, sources) {
     for (const item of source.telegram_links || []) {
       try {
         const url = new URL(item.url);
-        if (url.protocol !== 'https:' || url.hostname !== 't.me') continue;
+        const isAllowed = url.protocol === 'https:' && (url.hostname === 't.me' || url.hostname.endsWith('youtube.com') || url.hostname === 'youtu.be');
+        if (!isAllowed) continue;
         const anchor = document.createElement('a');
-        anchor.className = 'listen-link';
+        const isYT = url.hostname.includes('youtu');
+        anchor.className = isYT ? 'listen-link youtube-link' : 'listen-link';
         anchor.href = url.href;
         anchor.target = '_blank';
         anchor.rel = 'noopener noreferrer';
-        anchor.textContent = item.label || 'Listen on Telegram';
+        anchor.textContent = item.label || (isYT ? 'Watch on YouTube' : 'Listen on Telegram');
         row.append(anchor);
       } catch { /* Keep the reference and ignore an invalid link. */ }
     }
