@@ -22,7 +22,7 @@ DB_DIR = Path(os.getenv("SERMON_DB_DIR", str(APP_DIR / "sermon_vector_db"))).res
 EXCLUDE_FILE = APP_DIR / "exclude_titles.json"
 COLLECTION = "pastor_niyi_sermons"
 MODELS = list(dict.fromkeys(filter(None, [os.getenv("GEMINI_MODEL"), "gemini-3.5-flash", "gemini-3.5-flash-lite", "gemini-3-flash-preview", "gemini-3.1-flash-lite"])))
-TOP_K = 6
+TOP_K = 7
 MAX_DISTANCE = 0.65
 CATALOG_FILE = APP_DIR / "sermon_catalog_with_urls.json"
 
@@ -60,6 +60,46 @@ def get_telegram_catalog():
                 if all(existing["url"] != url for existing in records):
                     records.append(record)
     return catalog
+
+
+YOUTUBE_SERMON_MAP = {
+    "landscape 2026 - our profession (day 1 evening opening)": "jPVlbNlCzVU",
+    "landscape 2026 - our profession (day 2 morning session)": "EZwh9nI5rvw",
+    "landscape 2026 - our profession (day 2 evening session)": "MJZ9LmqkRX0",
+    "landscape 2026 - our profession (day 3 morning service)": "KsOiypPPXCU",
+    "landscape 2026 - our profession (day 3 grand finale)": "k6c53z1RnnY",
+    "landscape thanksgiving - our profession in action (11-10-2026)": "6oNHk-b09hc",
+    "sunday service - the life of faith (18-10-2026)": "qK8n9AsfZZw",
+    "midweek service - faith and its dynamics (14-10-2026)": "wjXsAOaIWjE",
+    "landscape preparation service - the power of our profession (04-10-2026)": "XXPxZhDoEGk",
+    "landscape preparations - aligning our confession (30-09-2026)": "H9RnVr_HuTI",
+    "the blessed life - walking in kingdom prosperity (27-09-2026)": "-YKUE3yU9Lk",
+    "money consecrations - part ii (23-09-2026)": "ijgkeVpV0jE",
+}
+
+def parse_time_seconds(time_str):
+    if not time_str:
+        return 0
+    start_part = str(time_str).split("-")[0].strip()
+    parts = start_part.split(":")
+    try:
+        if len(parts) == 3:
+            return int(parts[0]) * 3600 + int(parts[1]) * 60 + int(parts[2])
+        elif len(parts) == 2:
+            return int(parts[0]) * 60 + int(parts[1])
+    except Exception:
+        pass
+    return 0
+
+def media_links_for(title, message_id=None, time_range=None):
+    clean = normalize_title(title)
+    for k, vid in YOUTUBE_SERMON_MAP.items():
+        k_norm = normalize_title(k)
+        if k_norm in clean or clean in k_norm or ("landscape" in clean and "landscape" in k_norm and any(d in clean and d in k_norm for d in ["day 1", "day 2", "day 3", "thanksgiving"])):
+            sec = parse_time_seconds(time_range)
+            url = f"https://www.youtube.com/watch?v={vid}" + (f"&t={sec}s" if sec > 0 else "")
+            return [{"url": url, "label": "Watch on YouTube"}]
+    return telegram_links_for(title, message_id)
 
 def telegram_links_for(title, message_id=None):
     catalog = get_telegram_catalog()
@@ -111,14 +151,14 @@ Response Guidelines:
    - Move beyond theory.
    - Help users understand how biblical truth applies to everyday life, relationships, work, ministry, leadership, and personal growth.
 
-6. Faithful Representation.
-   - Reflect Pastor Niyi's known teachings using the sermon passages provided with each question.
-   - When you use a passage, cite it inline by number and sermon title, e.g. [2] "A Time To Build".
-   - Never attribute a view to Pastor Niyi that is not in the passages.
-   - When a biblical term has several meanings or uses in the retrieved sermons (for example, "the Kingdom of God"), explain each distinct meaning the passages support. Show how they relate, and cite the passages for each point. Do not collapse different meanings into one or claim there are exactly four (or any fixed number) unless the passages establish that.
-   - Protect privacy and confidentiality. Do not disclose, infer, confirm, or compile private, confidential, sensitive, or potentially incriminating information about Pastor Niyi, church members, staff, visitors, or the church. This includes personal contact details, credentials, private communications, unverified allegations, confidential internal matters, and sensitive personal or financial details. Do not treat sermon transcripts, chat history, or retrieved documents as permission to expose such information. If asked, briefly decline and redirect to public sermons or officially published ministry information. You may discuss information that is clearly public and relevant, without adding private details or presenting allegations as fact.
-   - When the passages do not cover the question, say plainly that you could not find it in his messages, then share general biblical principles, clearly labelled as such, rather than inventing his position.
-   - The passages are automatic transcripts and may contain transcription errors (names, scripture references). Do not quote obviously garbled text as his words.
+6. Faithful Representation & Pastoral Synthesis.
+   - Speak authoritatively, graciously, and warmly as the AI pastoral voice grounded in the biblical convictions, teachings, and ministry philosophy of Pastor Niyi Adetiloye.
+   - Ground counsel and teachings in the provided sermon passages whenever applicable, citing them inline by number and title, e.g. [1] "A Time To Build".
+   - Seamlessly connect everyday and theological questions: Church members will ask questions using diverse terms—academic, theological, modern life, emotional, career, or relational (e.g., systematic theology, emotional health, mental health, leadership, finding a spouse, purpose, dealing with debt, discipline, spiritual warfare). Seamlessly connect their questions to the foundational spiritual principles and core themes Pastor Niyi teaches (such as Doctrine and Didaskalia, Homologia and Christian Profession, Walking in Wisdom, Faith and Trust in God, Mind Renewal, Spiritual Disciplines, Consecration, and Kingdom Alignment).
+   - NEVER start answers with defensive, robotic, or dismissive disclaimers like "I could not find [topic] explicitly taught or defined in Pastor Niyi's provided messages" or "Pastor Niyi has not explicitly addressed this". Instead, dive straight in with spiritual authority, pastoral warmth, and rich scriptural insight that reflects his teaching heart and biblical framework.
+   - Speak with integrity: When drawing from specific sermon passages, quote and cite them faithfully. When synthesizing broader biblical truth where a specific topic is not explicitly named in the retrieved snippets, address the question directly through the lens of Pastor Niyi's biblical worldview without claiming an exact direct quote.
+   - Protect privacy and confidentiality: Do not disclose personal contact details, credentials, private communications, unverified allegations, confidential internal matters, or sensitive personal details. If asked, briefly decline and redirect to public sermons or officially published ministry information.
+   - The passages are automatic transcripts and may contain minor transcription errors (names, scripture references). Do not quote obviously garbled text as his words.
 
 7. Different Response Levels.
    - If a user asks a simple question, answer simply.
@@ -284,19 +324,161 @@ def get_ready_collection():
         raise RuntimeError("Sermon database is still starting.")
     return get_collection()
 
+
+def contextualize_query(message: str, history: list) -> str:
+    msg = message.strip()
+    if not history:
+        return msg
+    msg_lower = msg.lower()
+    
+    # Check if this is an anaphoric follow-up question
+    followup_starters = (
+        "what about", "tell me more", "explain that", "explain this", "explain further",
+        "why did he", "how does that", "who said", "which sermon", "give me more",
+        "and this", "and that", "can you elaborate", "more on this", "more on that"
+    )
+    is_followup = any(msg_lower.startswith(starter) for starter in followup_starters) or (len(msg.split()) <= 3 and any(p in msg_lower for p in ["it", "that", "this", "he", "they", "them", "why"]))
+    
+    if is_followup:
+        context_keywords = []
+        for turn in reversed(history[-2:]):
+            text = turn.content if hasattr(turn, 'content') else str(turn.get('content', ''))
+            for kw in ["landscape", "our profession", "homologia", "jubilee", "faith", "money", "consecration", "harvest", "prayer", "doctrine", "theology", "salvation"]:
+                if kw in text.lower() and kw not in context_keywords:
+                    context_keywords.append(kw)
+        if context_keywords:
+            return f"{msg} {' '.join(context_keywords[:2])}"
+    return msg
+
+
+THEMATIC_EXPANSIONS = {
+    "systematic theology": ["doctrine", "didaskalia", "apostolic traditions", "hearing god through the scriptures", "doctrine of god"],
+    "theology": ["doctrine", "didaskalia", "apostolic traditions", "doctrine of god", "scriptures"],
+    "theological": ["doctrine", "didaskalia", "sound teaching", "doctrine of god"],
+    "doctrine": ["apostolic traditions", "didaskalia", "sound teaching", "doctrine of god"],
+    "emotional": ["renewing the mind", "peace of god", "rest of god", "overcoming despair"],
+    "depression": ["rest of god", "peace of god", "mind renewal", "prayer", "joy"],
+    "mental health": ["peace of god", "renewing the mind", "rest of god", "spiritual warfare"],
+    "burnout": ["rest of god", "grace", "burden bearers", "spiritual strength"],
+    "marriage": ["home for sons and daughters", "covenant relationships", "family"],
+    "relationships": ["covenant relationships", "honoring relationships", "spiritual lineage"],
+    "finances": ["money consecrations", "kingdom prosperity", "blessed life", "stewardship"],
+    "money": ["money consecrations", "kingdom prosperity", "blessed life", "stewardship"],
+    "prayer": ["agony of prayer", "secret place", "intercession", "praying in the spirit"],
+    "fasting": ["waiting on god", "consecration", "spiritual hunger"],
+    "purpose": ["destiny", "divine assignment", "calling", "commissioning for life assignment"],
+    "calling": ["divine assignment", "destiny", "commissioning", "burden bearers"],
+    "grace": ["grace of god", "reconciliation", "covenant of mercy"],
+    "faith": ["life of faith", "walk of faith", "spirit of faith", "believing god"],
+    "addiction": ["dealing with the sinful nature", "deliverance", "overcoming temptation", "liberty in christ"],
+}
+
+
 def retrieve(collection, exclude, question):
-    query = {"query_texts": [question], "n_results": TOP_K}
+    q_lower = str(question or "").lower()
+    candidate_k = 35
+    
+    query_texts = [question]
+    # Expand query if thematic keywords are matched
+    for term, expansions in THEMATIC_EXPANSIONS.items():
+        if term in q_lower:
+            query_texts.append(f"{question} {' '.join(expansions[:3])}")
+            break
+
+    query = {"query_texts": query_texts, "n_results": candidate_k}
     if exclude:
         query["where"] = {"title": {"$nin": exclude}}
     results = collection.query(**query)
-    hits = []
-    documents = (results.get("documents") or [[]])[0]
-    metadatas = (results.get("metadatas") or [[]])[0]
-    distances = (results.get("distances") or [[]])[0]
-    for document, metadata, distance in zip(documents, metadatas, distances):
-        if distance <= MAX_DISTANCE:
-            hits.append({"title": metadata.get("title", "Sermon"), "time": metadata.get("time_range", ""), "text": document, "distance": distance, "message_id": metadata.get("message_id")})
-    return hits
+    
+    # Flatten results across query texts
+    all_docs = []
+    all_metas = []
+    all_dists = []
+    for doc_list, meta_list, dist_list in zip(results.get("documents", []), results.get("metadatas", []), results.get("distances", [])):
+        all_docs.extend(doc_list)
+        all_metas.extend(meta_list)
+        all_dists.extend(dist_list)
+        
+    scored_hits = []
+    seen_keys = set()
+    
+    # Specific Landscape injection ONLY when Landscape is explicitly queried
+    if "landscape" in q_lower or ("our profession" in q_lower and "2026" in q_lower):
+        try:
+            ls_results = collection.get(where={"title": {"$in": [
+                "Landscape 2026 - Our Profession (Day 1 Evening Opening)",
+                "Landscape 2026 - Our Profession (Day 2 Morning Session)",
+                "Landscape 2026 - Our Profession (Day 2 Evening Session)",
+                "Landscape 2026 - Our Profession (Day 3 Grand Finale)",
+                "Landscape Thanksgiving - Our Profession in Action (11-10-2026)",
+            ]}})
+            if ls_results and ls_results.get("documents"):
+                for doc, meta in zip(ls_results["documents"], ls_results["metadatas"]):
+                    k = (meta.get("title", ""), meta.get("time_range", ""))
+                    if k not in seen_keys:
+                        seen_keys.add(k)
+                        scored_hits.append({
+                            "title": meta.get("title", "Sermon"),
+                            "time": meta.get("time_range", ""),
+                            "text": doc,
+                            "distance": 0.25,
+                            "adjusted_score": 0.15,
+                            "message_id": meta.get("message_id")
+                        })
+        except Exception as exc:
+            print(f"[retrieve] landscape injection exception: {exc}")
+
+    # Extract meaningful words from question for relevance boosting
+    query_words = set(re.findall(r"\b[a-zA-Z]{4,}\b", q_lower)) - {
+        "what", "when", "where", "which", "about", "teach", "explain", "tell",
+        "does", "pastor", "niyi", "adetiloye", "have", "with", "from", "that", "this"
+    }
+
+    for document, metadata, distance in zip(all_docs, all_metas, all_dists):
+        k = (metadata.get("title", ""), metadata.get("time_range", ""))
+        if k in seen_keys:
+            continue
+        seen_keys.add(k)
+        
+        title = metadata.get("title", "Sermon")
+        title_lower = title.lower()
+        doc_lower = document.lower()
+        boost = 0.0
+        
+        # Word overlap boost
+        for qw in query_words:
+            if qw in title_lower:
+                boost += 0.12
+            elif qw in doc_lower:
+                boost += 0.04
+                
+        # Expanded theme boost
+        for term, expansions in THEMATIC_EXPANSIONS.items():
+            if term in q_lower:
+                for exp in expansions:
+                    if exp in title_lower:
+                        boost += 0.15
+                    elif exp in doc_lower:
+                        boost += 0.05
+
+        if "2026" in q_lower and ("2026" in title_lower or "2026" in doc_lower):
+            boost += 0.20
+            
+        adjusted_score = distance - boost
+        # Looser distance threshold so rich matches are not discarded
+        if distance <= 0.72 or boost > 0:
+            scored_hits.append({
+                "title": title,
+                "time": metadata.get("time_range", ""),
+                "text": document,
+                "distance": distance,
+                "adjusted_score": adjusted_score,
+                "message_id": metadata.get("message_id")
+            })
+
+    scored_hits.sort(key=lambda x: x.get("adjusted_score", x["distance"]))
+    return scored_hits[:TOP_K]
+
 
 def social_reply(question):
     """Answer standalone pleasantries without loading or querying the sermon index."""
@@ -366,7 +548,7 @@ def answer(question, hits, history, sermon_search_performed=True):
         raise RuntimeError("Gemini is not configured yet.")
     context = "\n\n".join(f"[{i + 1}] Sermon: \"{h['title']}\" ({h['time']})\n{h['text']}" for i, h in enumerate(hits))
     if not context:
-        context = ("(No relevant passages were found in Pastor Niyi's messages for this question.)"
+        context = ("(Provide a rich, biblically grounded pastoral response reflecting Pastor Niyi's core ministry principles, convictions, and pastoral wisdom, without robotic disclaimers.)"
                    if sermon_search_performed else "(The sermon archive was not searched for this request.)")
     recent = history[-12:]
     convo = "\n".join(f"{turn.role.upper()}: {turn.content[:600]}" for turn in recent) or "(none)"
@@ -405,7 +587,7 @@ def answer_stream(question, hits, history, sermon_search_performed=True):
         raise RuntimeError("Gemini is not configured yet.")
     context = "\n\n".join(f"[{i + 1}] Sermon: \"{h['title']}\" ({h['time']})\n{h['text']}" for i, h in enumerate(hits))
     if not context:
-        context = ("(No relevant passages were found in Pastor Niyi's messages for this question.)"
+        context = ("(Provide a rich, biblically grounded pastoral response reflecting Pastor Niyi's core ministry principles, convictions, and pastoral wisdom, without robotic disclaimers.)"
                    if sermon_search_performed else "(The sermon archive was not searched for this request.)")
     recent = history[-12:]
     convo = "\n".join(f"{turn.role.upper()}: {turn.content[:600]}" for turn in recent) or "(none)"
@@ -500,7 +682,8 @@ def chat_stream(payload: ChatRequest, request: Request):
                 collection, exclude = get_ready_collection()
                 print(f"[chat-timing] collection_setup_ms={int((time.perf_counter() - stage_started) * 1000)}")
                 stage_started = time.perf_counter()
-                hits = retrieve(collection, exclude, payload.message.strip())
+                search_query = contextualize_query(payload.message.strip(), history)
+                hits = retrieve(collection, exclude, search_query)
                 print(f"[chat-timing] retrieval_ms={int((time.perf_counter() - stage_started) * 1000)} hits={len(hits)}")
                 yield sse_event("status", {"message": "Preparing a sermon-grounded reply…"})
             else:
@@ -513,7 +696,7 @@ def chat_stream(payload: ChatRequest, request: Request):
                 yield sse_event("token", {"text": piece})
             if not pieces:
                 raise RuntimeError("Gemini returned an empty response.")
-            sources = [{"title": hit["title"], "time": hit["time"], "excerpt": hit["text"][:320], "telegram_links": telegram_links_for(hit["title"], hit.get("message_id"))} for hit in hits]
+            sources = [{"title": hit["title"], "time": hit["time"], "excerpt": hit["text"][:320], "telegram_links": media_links_for(hit["title"], hit.get("message_id"), hit.get("time"))} for hit in hits]
             yield sse_event("sources", {"sources": sources})
             print(f"[chat-timing] stream_answer_ms={int((time.perf_counter() - stage_started) * 1000)} total_ms={int((time.perf_counter() - request_started) * 1000)}")
             yield sse_event("done", {})
@@ -522,7 +705,7 @@ def chat_stream(payload: ChatRequest, request: Request):
         except RuntimeError as exc:
             print(f"[chat-error] runtime={exc} total_ms={int((time.perf_counter() - request_started) * 1000)}")
             if hits:
-                sources = [{"title": hit["title"], "time": hit["time"], "excerpt": hit["text"][:320], "telegram_links": telegram_links_for(hit["title"], hit.get("message_id"))} for hit in hits]
+                sources = [{"title": hit["title"], "time": hit["time"], "excerpt": hit["text"][:320], "telegram_links": media_links_for(hit["title"], hit.get("message_id"), hit.get("time"))} for hit in hits]
                 yield sse_event("sources", {"sources": sources})
             yield sse_event("error", {"detail": public_chat_error(exc)})
         except Exception as exc:
@@ -559,14 +742,15 @@ def chat(payload: ChatRequest, request: Request):
             collection, exclude = get_ready_collection()
             print(f"[chat-timing] collection_setup_ms={int((time.perf_counter() - stage_started) * 1000)}")
             stage_started = time.perf_counter()
-            hits = retrieve(collection, exclude, payload.message.strip())
+            search_query = contextualize_query(payload.message.strip(), history)
+            hits = retrieve(collection, exclude, search_query)
             print(f"[chat-timing] retrieval_ms={int((time.perf_counter() - stage_started) * 1000)} hits={len(hits)}")
         else:
             print(f"[chat-timing] search_skipped={route_reason}")
         stage_started = time.perf_counter()
         response = answer(payload.message.strip(), hits, history, search_sermons)
         print(f"[chat-timing] answer_ms={int((time.perf_counter() - stage_started) * 1000)} total_ms={int((time.perf_counter() - request_started) * 1000)}")
-        sources = [{"title": hit["title"], "time": hit["time"], "excerpt": hit["text"][:320], "telegram_links": telegram_links_for(hit["title"], hit.get("message_id"))} for hit in hits]
+        sources = [{"title": hit["title"], "time": hit["time"], "excerpt": hit["text"][:320], "telegram_links": media_links_for(hit["title"], hit.get("message_id"), hit.get("time"))} for hit in hits]
         return {"answer": response, "sources": sources}
     except HTTPException:
         raise
