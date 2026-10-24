@@ -709,13 +709,16 @@ window.submitMemberLogin = async function() {
   }
 };
 
-// Check Google OAuth Config & Setup
+// Check Google OAuth Config & Setup with robust script load retry
 async function initGoogleOAuth() {
   try {
     const res = await fetch('/api/auth/config');
     const data = await res.json();
-    if (data.google_client_id) {
-      configuredGoogleClientId = data.google_client_id;
+    if (!data.google_client_id) return;
+    configuredGoogleClientId = data.google_client_id;
+
+    let attempts = 0;
+    function renderGSI() {
       if (window.google?.accounts?.id) {
         window.google.accounts.id.initialize({
           client_id: configuredGoogleClientId,
@@ -725,17 +728,25 @@ async function initGoogleOAuth() {
         const container = document.getElementById('google-button-rendered');
         if (container) {
           window.google.accounts.id.renderButton(container, {
+            type: 'standard',
             theme: 'outline',
             size: 'large',
-            width: 280
+            text: 'continue_with',
+            shape: 'rectangular',
+            logo_alignment: 'left',
+            width: 320
           });
           container.hidden = false;
           if (triggerGoogleBtn) triggerGoogleBtn.hidden = true;
         }
+      } else if (attempts < 15) {
+        attempts++;
+        setTimeout(renderGSI, 250);
       }
     }
+    renderGSI();
   } catch (err) {
-    console.warn('Could not fetch Google auth config:', err);
+    console.warn('Could not initialize Google OAuth:', err);
   }
 }
 
