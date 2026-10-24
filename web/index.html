@@ -7,7 +7,7 @@
   <meta name="description" content="Explore Pastor Niyi Adetiloye’s teachings through sermon-grounded answers.">
   <title>Pastor Niyi AI</title>
   <link rel="icon" type="image/svg+xml" href="/assets/bible-favicon.svg?v=1">
-  <link rel="stylesheet" href="/web/styles.css?v=20261024d">
+  <link rel="stylesheet" href="/web/styles.css?v=20261024e">
   <!-- Google Identity Services for Option B Google Sign-In -->
   <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
@@ -21,6 +21,18 @@
 
       <div class="topbar-actions">
         <div class="online"><i></i> <span>Grounded in sermons</span></div>
+
+        <!-- New Study & Saved Conversations Trigger Buttons -->
+        <button type="button" class="topbar-pill-btn new-chat-pill" id="new-chat-btn" title="Start a fresh study session">
+          <svg class="pill-svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+          <span class="pill-text">New Study</span>
+        </button>
+
+        <button type="button" class="topbar-pill-btn" id="open-history-btn" aria-haspopup="dialog" aria-expanded="false" title="Open saved study conversations">
+          <svg class="pill-svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+          <span class="pill-text">Saved Studies</span>
+          <span id="history-count-badge" class="pill-badge" hidden>0</span>
+        </button>
 
         <!-- Suggestion Box Trigger Button -->
         <button type="button" class="topbar-pill-btn" id="open-feedback-btn" aria-haspopup="dialog" aria-expanded="false" title="Share observations or sermon corrections with the pastoral team">
@@ -52,8 +64,14 @@
                 <small id="dropdown-user-email"></small>
               </div>
               <div class="dropdown-line"></div>
+              <button type="button" class="dropdown-row-btn" id="dropdown-history-btn" role="menuitem">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="margin-right:7px; vertical-align:-2px;"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                Saved Studies (<span id="user-threads-count">0</span>)
+              </button>
+              <div class="dropdown-line"></div>
               <button type="button" class="dropdown-row-btn" id="view-bookmarks-btn" role="menuitem">
-                🔖 Saved Bookmarks (<span id="user-bookmark-count">0</span>)
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="margin-right:7px; vertical-align:-2px;"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg>
+                Saved Bookmarks (<span id="user-bookmark-count">0</span>)
               </button>
               <div class="dropdown-line"></div>
               <button type="button" class="dropdown-row-btn signout" id="user-signout-btn" role="menuitem">
@@ -79,6 +97,18 @@
       </div>
     </section>
 
+    <div class="active-study-bar" id="active-study-bar" hidden>
+      <div class="study-meta">
+        <span class="study-status-indicator"></span>
+        <span class="study-title" id="active-study-title">Current Study Session</span>
+      </div>
+      <div class="study-actions">
+        <button type="button" class="study-action-btn" id="save-thread-btn" title="Save this study conversation to your account">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+          <span id="save-thread-label">Save Study</span>
+        </button>
+      </div>
+    </div>
     <section id="conversation" class="conversation" aria-live="polite" aria-label="Conversation"></section>
     <div id="error" class="error" role="status" hidden></div>
 
@@ -159,6 +189,42 @@
           <p>Your note has been received by the ministry team and will be reviewed with prayerful care. Thank you for helping strengthen this resource.</p>
           <button type="button" class="sheet-btn primary" id="feedback-done-btn">Return to Study</button>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SAVED STUDY CONVERSATIONS MODAL -->
+  <div id="history-modal" class="modal-backdrop" hidden role="dialog" aria-modal="true" aria-labelledby="history-modal-title">
+    <div class="modal-sheet">
+      <div class="modal-sheet-header">
+        <div class="modal-title-wrap">
+          <div>
+            <h2 id="history-modal-title">Saved Studies & Dialogues</h2>
+            <p class="modal-subtitle">Revisit and continue your past pastoral study conversations.</p>
+          </div>
+        </div>
+        <button type="button" class="sheet-close" id="close-history-btn" aria-label="Close modal">✕</button>
+      </div>
+
+      <div class="modal-sheet-body">
+        <div id="history-guest-notice" class="history-guest-card" hidden>
+          <div class="guest-card-content">
+            <svg class="guest-card-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+            <div>
+              <strong>Sign in to preserve your study history</strong>
+              <p>Your conversations can be saved to your member profile and accessed on any device.</p>
+            </div>
+          </div>
+          <button type="button" class="sheet-btn primary sm" id="history-signin-btn">Sign In</button>
+        </div>
+
+        <div id="history-empty" class="bookmarks-empty-state" hidden>
+          <svg class="empty-svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#8fa095" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+          <h4>No saved study sessions yet</h4>
+          <p>When studying teachings, click <em>Save Study</em> to archive the conversation and continue it anytime.</p>
+        </div>
+
+        <div id="history-list" class="history-list"></div>
       </div>
     </div>
   </div>
@@ -245,7 +311,7 @@
     </div>
   </div>
 
-  <script src="/web/chat-stream.js?v=20261024d" defer></script>
-  <script src="/web/app.js?v=20261024d" defer></script>
+  <script src="/web/chat-stream.js?v=20261024e" defer></script>
+  <script src="/web/app.js?v=20261024e" defer></script>
 </body>
 </html>

@@ -8,6 +8,9 @@ const errorBox = document.querySelector('#error');
 const historyKey = 'pastor-niyi-ai:main:v1';
 let history = window.loadPastorChatHistory(historyKey);
 let busy = false;
+let activeThreadId = null;
+let activeThreadTitle = 'Current Study Session';
+
 
 function cleanMarkdown(text) {
   return String(text || '')
@@ -256,6 +259,10 @@ async function ask(text, retrying = false) {
     history.push({ role: 'user', content: text }, { role: 'assistant', content: answerText, sources });
     history = history.slice(-12);
     window.savePastorChatHistory(historyKey, history);
+    updateStudyBar();
+    if (saveThreadBtn && !saveThreadBtn.classList.contains('saved')) {
+      if (saveThreadLabel) saveThreadLabel.textContent = 'Save Study';
+    }
   } catch (err) {
     if (answerText) {
       bubble.classList.remove('typing', 'streaming');
@@ -313,7 +320,287 @@ if (history.length) {
       addSources(row.querySelector('.message-bubble'), turn.sources);
     }
   }
+  updateStudyBar();
 }
+
+
+
+// --- Active Study Session Bar & Thread UI ---
+const activeStudyBar = document.getElementById('active-study-bar');
+const activeStudyTitle = document.getElementById('active-study-title');
+const saveThreadBtn = document.getElementById('save-thread-btn');
+const saveThreadLabel = document.getElementById('save-thread-label');
+const newChatBtn = document.getElementById('new-chat-btn');
+const openHistoryBtn = document.getElementById('open-history-btn');
+const closeHistoryBtn = document.getElementById('close-history-btn');
+const historyModal = document.getElementById('history-modal');
+const historyList = document.getElementById('history-list');
+const historyEmpty = document.getElementById('history-empty');
+const historyGuestNotice = document.getElementById('history-guest-notice');
+const historySigninBtn = document.getElementById('history-signin-btn');
+const historyCountBadge = document.getElementById('history-count-badge');
+const userThreadsCount = document.getElementById('user-threads-count');
+const dropdownHistoryBtn = document.getElementById('dropdown-history-btn');
+
+function updateStudyBar() {
+  if (!activeStudyBar) return;
+  if (history.length > 0) {
+    activeStudyBar.hidden = false;
+    if (activeStudyTitle) {
+      if (activeThreadTitle && activeThreadTitle !== 'Current Study Session') {
+        activeStudyTitle.textContent = activeThreadTitle;
+      } else {
+        const firstUserTurn = history.find(t => t.role === 'user');
+        const candidate = firstUserTurn ? firstUserTurn.content.slice(0, 50) + (firstUserTurn.content.length > 50 ? '…' : '') : 'Current Study Session';
+        activeStudyTitle.textContent = candidate;
+      }
+    }
+  } else {
+    activeStudyBar.hidden = true;
+  }
+}
+
+function startNewStudy() {
+  history = [];
+  activeThreadId = null;
+  activeThreadTitle = 'Current Study Session';
+  window.savePastorChatHistory(historyKey, []);
+  conversation.replaceChildren();
+  welcome.hidden = false;
+  if (activeStudyBar) activeStudyBar.hidden = true;
+  if (saveThreadBtn) {
+    saveThreadBtn.classList.remove('saved');
+    if (saveThreadLabel) saveThreadLabel.textContent = 'Save Study';
+  }
+  input.value = '';
+  input.focus();
+}
+
+newChatBtn?.addEventListener('click', startNewStudy);
+
+async function saveCurrentThread() {
+  if (history.length === 0) {
+    showToast('Start a conversation first before saving.');
+    return;
+  }
+  const token = getUserToken();
+  if (!token) {
+    showToast('Please sign in to save study conversations.');
+    openAuthModal();
+    return;
+  }
+
+  try {
+    if (saveThreadBtn) saveThreadBtn.disabled = true;
+    if (saveThreadLabel) saveThreadLabel.textContent = 'Saving…';
+
+    const firstUser = history.find(t => t.role === 'user');
+    let title = activeThreadTitle;
+    if (!title || title === 'Current Study Session') {
+      title = firstUser ? firstUser.content.slice(0, 60) + (firstUser.content.length > 60 ? '…' : '') : 'Study Session';
+    }
+
+    const res = await fetch('/api/user/threads', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        id: activeThreadId,
+        title: title,
+        messages: history
+      })
+    });
+
+    const data = await res.json();
+    if (data.ok && data.thread) {
+      activeThreadId = data.thread.id;
+      activeThreadTitle = data.thread.title;
+      updateStudyBar();
+      if (saveThreadBtn) {
+        saveThreadBtn.classList.add('saved');
+        if (saveThreadLabel) saveThreadLabel.textContent = 'Saved ✦';
+      }
+      showToast('Conversation saved to your account!');
+      loadSavedThreadsList();
+    } else {
+      throw new Error(data.detail || 'Could not save study.');
+    }
+  } catch (err) {
+    console.error('Save thread error:', err);
+    showToast('Failed to save study conversation.');
+    if (saveThreadLabel) saveThreadLabel.textContent = 'Save Study';
+  } finally {
+    if (saveThreadBtn) saveThreadBtn.disabled = false;
+  }
+}
+
+saveThreadBtn?.addEventListener('click', saveCurrentThread);
+
+// --- History Modal & Threads List ---
+function openHistoryModal() {
+  if (userDropdownCard) userDropdownCard.hidden = true;
+  if (!historyModal) return;
+  historyModal.hidden = false;
+  loadSavedThreadsList();
+}
+
+function closeHistoryModal() {
+  if (historyModal) historyModal.hidden = true;
+}
+
+openHistoryBtn?.addEventListener('click', openHistoryModal);
+dropdownHistoryBtn?.addEventListener('click', openHistoryModal);
+closeHistoryBtn?.addEventListener('click', closeHistoryModal);
+historySigninBtn?.addEventListener('click', () => {
+  closeHistoryModal();
+  openAuthModal();
+});
+
+historyModal?.addEventListener('click', (e) => {
+  if (e.target === historyModal) closeHistoryModal();
+});
+
+async function loadSavedThreadsList() {
+  const token = getUserToken();
+  if (!token) {
+    if (historyGuestNotice) historyGuestNotice.hidden = false;
+    if (historyEmpty) historyEmpty.hidden = true;
+    if (historyList) historyList.innerHTML = '';
+    return;
+  }
+
+  if (historyGuestNotice) historyGuestNotice.hidden = true;
+
+  try {
+    const res = await fetch('/api/user/threads', {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    const data = await res.json();
+    if (data.ok && Array.isArray(data.threads)) {
+      renderThreads(data.threads);
+      const count = data.threads.length;
+      if (historyCountBadge) {
+        historyCountBadge.textContent = count;
+        historyCountBadge.hidden = count === 0;
+      }
+      if (userThreadsCount) {
+        userThreadsCount.textContent = count;
+      }
+    }
+  } catch (err) {
+    console.error('Error fetching threads:', err);
+  }
+}
+
+function renderThreads(threads) {
+  if (!historyList || !historyEmpty) return;
+
+  if (threads.length === 0) {
+    historyEmpty.hidden = false;
+    historyList.innerHTML = '';
+    return;
+  }
+
+  historyEmpty.hidden = true;
+  historyList.innerHTML = threads.map(t => {
+    const isActive = t.id === activeThreadId;
+    const dateStr = t.updated_at ? new Date(t.updated_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : '';
+    return `
+      <div class="history-item ${isActive ? 'active' : ''}" onclick="openSavedThread('${t.id}')">
+        <div class="history-item-body">
+          <h4 class="history-item-title">${escapeHTML(t.title)}</h4>
+          <div class="history-item-meta">
+            <span>${escapeHTML(dateStr)}</span>
+            <span>·</span>
+            <span>${t.message_count || 0} messages</span>
+          </div>
+          ${t.preview ? `<p class="history-item-preview">${escapeHTML(t.preview)}</p>` : ''}
+        </div>
+        <button type="button" class="history-item-del-btn" onclick="deleteSavedThread(event, '${t.id}')" title="Delete conversation">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+        </button>
+      </div>
+    `;
+  }).join('');
+}
+
+window.openSavedThread = async function(threadId) {
+  const token = getUserToken();
+  if (!token) return;
+
+  try {
+    const res = await fetch(`/api/user/threads/${encodeURIComponent(threadId)}`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    const data = await res.json();
+    if (data.ok && data.thread) {
+      activeThreadId = data.thread.id;
+      activeThreadTitle = data.thread.title;
+      history = (data.thread.messages || []).map(m => ({
+        role: m.role,
+        content: m.content,
+        sources: m.sources || []
+      }));
+      window.savePastorChatHistory(historyKey, history);
+    updateStudyBar();
+    if (saveThreadBtn && !saveThreadBtn.classList.contains('saved')) {
+      if (saveThreadLabel) saveThreadLabel.textContent = 'Save Study';
+    }
+
+      // Re-render conversation
+      conversation.replaceChildren();
+      welcome.hidden = true;
+      for (const turn of history) {
+        const row = addMessage(turn.role, turn.content);
+        if (turn.role === 'assistant' && turn.sources?.length) {
+          addSources(row.querySelector('.message-bubble'), turn.sources);
+        }
+      }
+      updateStudyBar();
+      if (saveThreadBtn) {
+        saveThreadBtn.classList.add('saved');
+        if (saveThreadLabel) saveThreadLabel.textContent = 'Saved ✦';
+      }
+      closeHistoryModal();
+      showToast(`Loaded "${data.thread.title}"`);
+    }
+  } catch (err) {
+    console.error('Error loading thread:', err);
+    showToast('Failed to load conversation.');
+  }
+};
+
+window.deleteSavedThread = async function(event, threadId) {
+  event.stopPropagation();
+  const token = getUserToken();
+  if (!token) return;
+
+  if (!confirm('Are you sure you want to remove this saved conversation?')) return;
+
+  try {
+    const res = await fetch(`/api/user/threads/${encodeURIComponent(threadId)}`, {
+      method: 'DELETE',
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    const data = await res.json();
+    if (data.ok) {
+      if (activeThreadId === threadId) {
+        activeThreadId = null;
+        activeThreadTitle = 'Current Study Session';
+        if (saveThreadBtn) {
+          saveThreadBtn.classList.remove('saved');
+          if (saveThreadLabel) saveThreadLabel.textContent = 'Save Study';
+        }
+      }
+      loadSavedThreadsList();
+      showToast('Conversation deleted.');
+    }
+  } catch (err) {
+    console.error('Error deleting thread:', err);
+  }
+};
 
 
 /* ==========================================================================
@@ -523,6 +810,8 @@ function showSignedInUI(user) {
   if (dropdownUserName) dropdownUserName.textContent = displayName;
   if (dropdownUserEmail) dropdownUserEmail.textContent = user.email || '';
   if (userBookmarkCount) userBookmarkCount.textContent = user.bookmarks?.length || 0;
+  if (userThreadsCount) userThreadsCount.textContent = user.threads?.length || 0;
+  loadSavedThreadsList();
 
   if (userAvatarImg) {
     if (user.picture) {

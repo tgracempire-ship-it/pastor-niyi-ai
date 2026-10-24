@@ -41,6 +41,10 @@ from auth_and_feedback import (
     get_user_profile,
     add_user_bookmark,
     remove_user_bookmark,
+    get_user_threads,
+    get_user_thread,
+    save_user_thread,
+    remove_user_thread,
 )
 
 APP_DIR = Path(__file__).resolve().parent
@@ -317,6 +321,11 @@ class UserBookmarkRequest(BaseModel):
     title: str = Field(min_length=1, max_length=300)
     excerpt: str = Field(default="", max_length=500)
     url: str = Field(default="", max_length=1000)
+
+class UserThreadSaveRequest(BaseModel):
+    id: Optional[str] = None
+    title: Optional[str] = ""
+    messages: list = Field(default_factory=list)
 
 _rate_lock = threading.Lock()
 _rate_counts = {}
@@ -929,6 +938,32 @@ def delete_bookmark(bookmark_id: str, request: Request):
     user_id = require_user_id(request)
     bookmarks = remove_user_bookmark(user_id, bookmark_id)
     return {"ok": True, "bookmarks": bookmarks}
+
+@app.get("/api/user/threads")
+def list_threads(request: Request):
+    user_id = require_user_id(request)
+    threads = get_user_threads(user_id)
+    return {"ok": True, "threads": threads}
+
+@app.get("/api/user/threads/{thread_id}")
+def get_thread_detail(thread_id: str, request: Request):
+    user_id = require_user_id(request)
+    thread = get_user_thread(user_id, thread_id)
+    if not thread:
+        raise HTTPException(status_code=404, detail="Saved study conversation not found.")
+    return {"ok": True, "thread": thread}
+
+@app.post("/api/user/threads")
+def save_thread(payload: UserThreadSaveRequest, request: Request):
+    user_id = require_user_id(request)
+    thread = save_user_thread(user_id, payload.title or "", payload.messages, payload.id)
+    return {"ok": True, "thread": thread}
+
+@app.delete("/api/user/threads/{thread_id}")
+def delete_thread(thread_id: str, request: Request):
+    user_id = require_user_id(request)
+    threads = remove_user_thread(user_id, thread_id)
+    return {"ok": True, "threads": threads}
 
 def sse_event(name, payload):
     data = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))

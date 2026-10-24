@@ -869,3 +869,224 @@
   display: block;
   margin: 0 auto 12px;
 }
+
+
+/* ==========================================================================
+   STUDY THREADS & CHAT HISTORY STYLES
+   ========================================================================== */
+
+.pill-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #1e463a;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.new-chat-pill {
+  background: #f1f6f2;
+  border-color: #c9dbc9;
+  color: #1e463a;
+  font-weight: 600;
+}
+.new-chat-pill:hover {
+  background: #e3ede4;
+  border-color: #a8c4ab;
+}
+
+.active-study-bar {
+  width: min(100%, 680px);
+  margin: 6px auto 14px;
+  padding: 8px 14px;
+  background: #fffefa;
+  border: 1px solid #e5e9e2;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  box-shadow: 0 2px 8px rgba(32, 61, 51, 0.04);
+}
+
+.study-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.study-status-indicator {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #78a683;
+  flex-shrink: 0;
+  box-shadow: 0 0 0 2px #e3eee3;
+}
+
+.study-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #203d33;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: inherit;
+}
+
+.study-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.study-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: #f8faf7;
+  border: 1px solid #d2ded0;
+  border-radius: 7px;
+  padding: 4px 9px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #244b3b;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-family: inherit;
+}
+.study-action-btn:hover {
+  background: #1e463a;
+  color: #fff;
+  border-color: #1e463a;
+}
+.study-action-btn.saved {
+  background: #e9f2ea;
+  color: #1f503e;
+  border-color: #b5d5b7;
+}
+
+.history-guest-card {
+  padding: 12px 14px;
+  background: #fbfbf6;
+  border: 1px solid #eceadd;
+  border-radius: 12px;
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.guest-card-content {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.guest-card-icon {
+  color: #a68b55;
+  flex-shrink: 0;
+}
+.guest-card-content strong {
+  display: block;
+  font-size: 12px;
+  color: #243a32;
+  margin-bottom: 2px;
+}
+.guest-card-content p {
+  margin: 0;
+  font-size: 11px;
+  color: #718077;
+  line-height: 1.35;
+}
+
+.history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  max-height: 420px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.history-item {
+  padding: 12px 14px;
+  background: #fffefa;
+  border: 1px solid #e3e8e1;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  cursor: pointer;
+  transition: all 0.16s ease;
+}
+.history-item:hover {
+  border-color: #a7c1ac;
+  background: #f7faf6;
+  transform: translateY(-1px);
+}
+.history-item.active {
+  border-color: #2b5d49;
+  background: #f4f8f4;
+  box-shadow: 0 0 0 1px #2b5d49;
+}
+
+.history-item-body {
+  flex: 1;
+  min-width: 0;
+}
+.history-item-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1e3f32;
+  margin: 0 0 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.history-item-meta {
+  font-size: 11px;
+  color: #7a8b80;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.history-item-meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.history-item-preview {
+  font-size: 11px;
+  color: #5c6c62;
+  margin: 4px 0 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.4;
+}
+
+.history-item-del-btn {
+  background: transparent;
+  border: 0;
+  color: #9ea9a2;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 6px;
+  display: grid;
+  place-items: center;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+.history-item-del-btn:hover {
+  color: #b23b32;
+  background: #fbeeed;
+}

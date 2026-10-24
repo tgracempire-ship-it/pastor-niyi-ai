@@ -312,7 +312,8 @@ def authenticate_google_credential(credential_jwt: str) -> Tuple[Optional[Dict[s
                 "provider": "google",
                 "created_at": now,
                 "last_login": now,
-                "bookmarks": []
+                "bookmarks": [],
+                "threads": []
             }
             users[user_id] = user
             
@@ -355,6 +356,101 @@ def remove_user_bookmark(user_id: str, bookmark_id: str) -> List[Dict[str, Any]]
     return user["bookmarks"]
 
 
+
+def get_user_threads(user_id: str) -> List[Dict[str, Any]]:
+    users = _load_users()
+    user = users.get(user_id)
+    if not user:
+        return []
+    threads = user.get("threads", [])
+    # Return sorted by updated_at descending, omitting large transcript details in list view
+    summary = []
+    for t in threads:
+        summary.append({
+            "id": t.get("id"),
+            "title": t.get("title", "Study Session"),
+            "created_at": t.get("created_at"),
+            "updated_at": t.get("updated_at"),
+            "message_count": len(t.get("messages", [])),
+            "preview": t.get("messages", [{}])[0].get("content", "")[:120] if t.get("messages") else ""
+        })
+    summary.sort(key=lambda x: x.get("updated_at") or x.get("created_at") or "", reverse=True)
+    return summary
+
+def get_user_thread(user_id: str, thread_id: str) -> Optional[Dict[str, Any]]:
+    users = _load_users()
+    user = users.get(user_id)
+    if not user:
+        return None
+    for t in user.get("threads", []):
+        if t.get("id") == thread_id:
+            return t
+    return None
+
+def save_user_thread(user_id: str, title: str, messages: List[Dict[str, Any]], thread_id: Optional[str] = None) -> Dict[str, Any]:
+    users = _load_users()
+    user = users.get(user_id)
+    if not user:
+        return {}
+    threads = user.setdefault("threads", [])
+    now = datetime.now(timezone.utc).isoformat()
+    
+    clean_messages = []
+    for m in messages:
+        if isinstance(m, dict) and m.get("role") in {"user", "assistant"}:
+            clean_messages.append({
+                "role": m.get("role"),
+                "content": str(m.get("content", ""))[:12000],
+                "sources": m.get("sources", []) if isinstance(m.get("sources"), list) else []
+            })
+            
+    # Derive title if not provided or generic
+    clean_title = str(title or "").strip()
+    if not clean_title or clean_title == "New Conversation":
+        for m in clean_messages:
+            if m.get("role") == "user" and m.get("content"):
+                first_text = m.get("content").strip()
+                clean_title = first_text[:60] + ("…" if len(first_text) > 60 else "")
+                break
+    if not clean_title:
+        clean_title = f"Study Session · {datetime.now(timezone.utc).strftime('%b %d, %H:%M')}"
+        
+    target_thread = None
+    if thread_id:
+        for t in threads:
+            if t.get("id") == thread_id:
+                target_thread = t
+                break
+                
+    if target_thread:
+        target_thread["title"] = clean_title
+        target_thread["messages"] = clean_messages
+        target_thread["updated_at"] = now
+    else:
+        new_id = f"th_{secrets.token_hex(6)}"
+        target_thread = {
+            "id": new_id,
+            "title": clean_title,
+            "messages": clean_messages,
+            "created_at": now,
+            "updated_at": now
+        }
+        threads.insert(0, target_thread)
+        
+    # Cap total stored threads per user to 50
+    user["threads"] = threads[:50]
+    _save_users(users)
+    return target_thread
+
+def remove_user_thread(user_id: str, thread_id: str) -> List[Dict[str, Any]]:
+    users = _load_users()
+    user = users.get(user_id)
+    if not user:
+        return []
+    user["threads"] = [t for t in user.get("threads", []) if t.get("id") != thread_id]
+    _save_users(users)
+    return get_user_threads(user_id)
+
 def authenticate_member_email(email: str, name: str = "") -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
     """Instant passwordless member profile using email."""
     email = str(email or "").strip().lower()
@@ -377,7 +473,8 @@ def authenticate_member_email(email: str, name: str = "") -> Tuple[Optional[Dict
             "provider": "email",
             "created_at": now,
             "last_login": now,
-            "bookmarks": []
+            "bookmarks": [],
+                "threads": []
         }
         users[user_id] = user
     _save_users(users)
