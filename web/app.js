@@ -743,8 +743,12 @@ triggerGoogleBtn?.addEventListener('click', () => {
   if (configuredGoogleClientId && window.google?.accounts?.id) {
     window.google.accounts.id.prompt();
   } else {
-    // Helpful guidance when Google Client ID has not been pasted yet
-    alert('Google OAuth requires an OAuth Client ID from Google Cloud Console.\n\nYou can sign in instantly with your email address above right now!\n\nTo enable Google 1-Tap button, paste your Google Client ID in the Executive Admin Console at /admin.');
+    if (authErrorAlert) {
+      authErrorAlert.className = 'form-alert info';
+      authErrorAlert.innerHTML = '👉 <strong>Instant Sign-In:</strong> Please enter your Google or personal email in the box above to access your profile immediately!<br><small style="opacity:0.85; display:block; margin-top:4px;">(To activate direct Google 1-Tap popup, paste your Google Cloud Client ID in /admin)</small>';
+      authErrorAlert.hidden = false;
+    }
+    memberEmailInput?.focus();
   }
 });
 

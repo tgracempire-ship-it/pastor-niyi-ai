@@ -698,3 +698,15 @@
   background: #fae4e4;
   border-color: #e59797;
 }
+
+
+.form-alert.info {
+  background: #f0f7f3;
+  border: 1px solid #c8dfd0;
+  color: #1e4a38;
+  font-size: 12px;
+  line-height: 1.5;
+  padding: 10px 14px;
+  border-radius: 10px;
+  margin-bottom: 14px;
+}
