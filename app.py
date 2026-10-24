@@ -328,11 +328,22 @@ _rate_lock = threading.Lock()
 _rate_counts = {}
 _sermon_warmup_done = threading.Event()
 
+def get_client_ip(request: Request) -> str:
+    """Extract real user IP from Cloudflare or reverse proxy headers."""
+    cf_ip = request.headers.get("CF-Connecting-IP", "").strip()
+    if cf_ip:
+        return cf_ip
+    xff = request.headers.get("X-Forwarded-For", "").strip()
+    if xff:
+        return xff.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
+
 def enforce_rate_limit(ip: str):
     now = time.time()
     with _rate_lock:
         recent = [t for t in _rate_counts.get(ip, []) if now - t < 60]
-        if len(recent) >= 10:
+        # Generous per-user window: 15 messages per minute
+        if len(recent) >= 15:
             raise HTTPException(status_code=429, detail="Please wait a minute before sending more questions.")
         recent.append(now)
         _rate_counts[ip] = recent
@@ -946,7 +957,7 @@ def public_chat_error(exc):
 @app.post("/api/chat/stream")
 def chat_stream(payload: ChatRequest, request: Request):
     request_started = time.perf_counter()
-    enforce_rate_limit(request.client.host if request.client else "unknown")
+    enforce_rate_limit(get_client_ip(request))
     history = [turn for turn in payload.history if turn.role in {"user", "assistant"}]
 
     def events():
@@ -1015,7 +1026,7 @@ def health():
 @app.post("/api/chat")
 def chat(payload: ChatRequest, request: Request):
     request_started = time.perf_counter()
-    enforce_rate_limit(request.client.host if request.client else "unknown")
+    enforce_rate_limit(get_client_ip(request))
     history = [turn for turn in payload.history if turn.role in {"user", "assistant"}]
     quick_reply = social_reply(payload.message)
     if quick_reply:

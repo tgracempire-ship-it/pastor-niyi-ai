@@ -1,3 +1,4 @@
+import threading
 """User Authentication (Google 1-Tap & Local) and Admin Feedback Management."""
 import base64
 import hashlib
@@ -121,8 +122,16 @@ def _load_feedbacks() -> List[Dict[str, Any]]:
     except Exception:
         return []
 
+_io_lock = threading.Lock()
+
+def _atomic_write_json(filepath: Path, data: Any):
+    with _io_lock:
+        temp_file = filepath.with_name(f"{filepath.name}.tmp.{secrets.token_hex(4)}")
+        temp_file.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+        temp_file.replace(filepath)
+
 def _save_feedbacks(feedbacks: List[Dict[str, Any]]):
-    FEEDBACKS_FILE.write_text(json.dumps(feedbacks, indent=2, ensure_ascii=False), encoding="utf-8")
+    _atomic_write_json(FEEDBACKS_FILE, feedbacks)
 
 def add_feedback(
     category: str,
@@ -229,7 +238,7 @@ def _load_users() -> Dict[str, Any]:
         return {}
 
 def _save_users(users: Dict[str, Any]):
-    USERS_FILE.write_text(json.dumps(users, indent=2, ensure_ascii=False), encoding="utf-8")
+    _atomic_write_json(USERS_FILE, users)
 
 def _create_user_token(user_id: str, email: str) -> str:
     auth = _load_admin_auth()
