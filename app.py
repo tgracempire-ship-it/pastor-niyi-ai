@@ -110,6 +110,12 @@ YOUTUBE_SERMON_MAP = {
     "landscape preparations - aligning our confession (30-09-2026)": "H9RnVr_HuTI",
     "the blessed life - walking in kingdom prosperity (27-09-2026)": "-YKUE3yU9Lk",
     "money consecrations - part ii (23-09-2026)": "ijgkeVpV0jE",
+    "maximizing your gifts and calling": "VF5FCp4_TNM",
+    "the devotional life": "VF5FCp4_TNM",
+    "the healthy spirit": "VF5FCp4_TNM",
+    "understanding the times": "VF5FCp4_TNM",
+    "maximizing opportunity": "VF5FCp4_TNM",
+    "serving under headship": "VF5FCp4_TNM",
 }
 
 def parse_time_seconds(time_str):
@@ -131,22 +137,13 @@ def media_links_for(title, message_id=None, time_range=None):
     seen_urls = set()
     clean_title = str(title or "").strip()
     
-    # 1. Telegram Audio Link (Exact catalog link or direct Telegram channel search)
-    tg_found = False
+    # 1. Telegram Audio Link (Direct catalog post link)
     for tg_link in telegram_links_for(clean_title, message_id):
         if tg_link["url"] not in seen_urls:
             seen_urls.add(tg_link["url"])
             links.append(tg_link)
-            tg_found = True
             
-    if not tg_found and clean_title:
-        safe_q = urllib.parse.quote_plus(clean_title)
-        tg_search_url = f"https://t.me/s/WeAreTDCI?q={safe_q}"
-        if tg_search_url not in seen_urls:
-            seen_urls.add(tg_search_url)
-            links.append({"url": tg_search_url, "label": "Listen on Telegram"})
-            
-    # 2. YouTube Video Link (Direct mapped video ID or direct YouTube search on Pastor Niyi's channel)
+    # 2. YouTube Video Link: ONLY provide direct video link if mapped. NEVER provide search links!
     clean = normalize_title(clean_title)
     yt_url = None
     for k, vid in YOUTUBE_SERMON_MAP.items():
@@ -165,10 +162,7 @@ def media_links_for(title, message_id=None, time_range=None):
             yt_url = f"https://www.youtube.com/watch?v={vid}" + (f"&t={sec}s" if sec > 0 else "")
             break
             
-    if not yt_url and clean_title:
-        yt_q = urllib.parse.quote_plus(f"Pastor Niyi Adetiloye {clean_title}")
-        yt_url = f"https://www.youtube.com/results?search_query={yt_q}"
-        
+    # Only append if an actual direct video exists
     if yt_url and yt_url not in seen_urls:
         seen_urls.add(yt_url)
         links.append({"url": yt_url, "label": "Watch on YouTube"})
