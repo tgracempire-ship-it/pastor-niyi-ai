@@ -710,3 +710,131 @@
   border-radius: 10px;
   margin-bottom: 14px;
 }
+
+
+/* ==========================================================================
+   IMPECCABLE CRAFT: REFINED EDITORIAL FEEDBACK MODAL
+   ========================================================================== */
+.modal-title-wrap h2 {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-size: 20px;
+  font-weight: 600;
+  color: #1e3f32;
+  margin: 0 0 4px;
+  letter-spacing: -0.01em;
+}
+
+.modal-subtitle {
+  font-size: 12.5px;
+  color: #62756a;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.cat-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 13px;
+  background: #f6f8f5;
+  border: 1px solid #d5dfd4;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: #355042;
+  cursor: pointer;
+  transition: all .16s ease;
+}
+
+.cat-chip svg {
+  color: currentColor;
+  opacity: 0.85;
+  flex-shrink: 0;
+}
+
+.cat-chip:hover {
+  background: #edf3ee;
+  border-color: #b7cab8;
+}
+
+.cat-chip.active {
+  background: #1e463a;
+  border-color: #1e463a;
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(30, 70, 58, 0.22);
+}
+
+.cat-chip.active svg {
+  opacity: 1;
+}
+
+.field-wrap textarea {
+  border-radius: 11px;
+  border: 1px solid #d4ded3;
+  background: #ffffff;
+  color: #1e352b;
+  padding: 12px 14px;
+  font-size: 13.5px;
+  line-height: 1.6;
+}
+
+.field-wrap input[type="text"] {
+  border-radius: 10px;
+  border: 1px solid #d4ded3;
+  background: #ffffff;
+  color: #1e352b;
+  padding: 10px 13px;
+  font-size: 13px;
+}
+
+.char-indicator {
+  font-family: inherit;
+  font-variant-numeric: tabular-nums;
+  font-size: 11px;
+  color: #7d8f83;
+}
+
+.privacy-note {
+  font-size: 11px;
+  color: #697c70;
+  line-height: 1.5;
+  margin-top: 5px;
+}
+
+.success-seal {
+  width: 52px;
+  height: 52px;
+  margin: 0 auto 16px;
+  border-radius: 50%;
+  background: #f3f8f4;
+  border: 1px solid #cde0d2;
+  display: grid;
+  place-items: center;
+  box-shadow: 0 2px 8px rgba(30, 70, 58, 0.08);
+}
+
+.seal-mark {
+  color: #b38e4a;
+  font-size: 20px;
+}
+
+.modal-success-state h3 {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-size: 22px;
+  font-weight: 600;
+  color: #1e463a;
+  margin: 0 0 8px;
+}
+
+.modal-success-state p {
+  font-size: 13px;
+  color: #576d60;
+  line-height: 1.6;
+  max-width: 380px;
+  margin: 0 auto 22px;
+}
+
+.pill-svg {
+  flex-shrink: 0;
+  vertical-align: middle;
+}

@@ -7,7 +7,7 @@
   <meta name="description" content="Explore Pastor Niyi Adetiloye’s teachings through sermon-grounded answers.">
   <title>Pastor Niyi AI</title>
   <link rel="icon" type="image/svg+xml" href="/assets/bible-favicon.svg?v=1">
-  <link rel="stylesheet" href="/web/styles.css?v=20261024a">
+  <link rel="stylesheet" href="/web/styles.css?v=20261024b">
   <!-- Google Identity Services for Option B Google Sign-In -->
   <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
@@ -23,9 +23,9 @@
         <div class="online"><i></i> <span>Grounded in sermons</span></div>
 
         <!-- Suggestion Box Trigger Button -->
-        <button type="button" class="topbar-pill-btn" id="open-feedback-btn" aria-haspopup="dialog" aria-expanded="false" title="Submit feedback or suggestion">
-          <span class="pill-icon">💡</span>
-          <span class="pill-text">Suggestion Box</span>
+        <button type="button" class="topbar-pill-btn" id="open-feedback-btn" aria-haspopup="dialog" aria-expanded="false" title="Share observations or sermon corrections with the pastoral team">
+          <svg class="pill-svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+          <span class="pill-text">Feedback & Notes</span>
         </button>
 
         <!-- User Profile / Google Sign-In Container (Option B) -->
@@ -90,15 +90,14 @@
     </form>
   </main>
 
-  <!-- SUGGESTION & FEEDBACK MODAL -->
+  <!-- SUGGESTION & PASTORAL OBSERVATION MODAL -->
   <div id="feedback-modal" class="modal-backdrop" hidden role="dialog" aria-modal="true" aria-labelledby="feedback-title">
     <div class="modal-sheet">
       <div class="modal-sheet-header">
         <div class="modal-title-wrap">
-          <div class="modal-gem">💡</div>
           <div>
-            <h2 id="feedback-title">Suggestion & Feedback Box</h2>
-            <p class="modal-subtitle">Share your ideas, report errors, or leave a note for the church team.</p>
+            <h2 id="feedback-title">Feedback & Observations</h2>
+            <p class="modal-subtitle">Contribute sermon corrections, teaching observations, or notes for the ministry team.</p>
           </div>
         </div>
         <button type="button" class="sheet-close" id="close-feedback-btn" aria-label="Close modal">✕</button>
@@ -109,32 +108,36 @@
           <div class="category-radio-group" role="radiogroup" aria-label="Feedback category">
             <label class="cat-chip active">
               <input type="radio" name="feedback-category" value="suggestion" checked>
-              <span>💡 Suggestion</span>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+              <span>Suggestion</span>
             </label>
             <label class="cat-chip">
               <input type="radio" name="feedback-category" value="sermon">
-              <span>📖 Sermon Note</span>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+              <span>Sermon Correction</span>
             </label>
             <label class="cat-chip">
               <input type="radio" name="feedback-category" value="bug">
-              <span>🐛 Bug / Issue</span>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+              <span>Technical Issue</span>
             </label>
             <label class="cat-chip">
               <input type="radio" name="feedback-category" value="testimony">
-              <span>❤️ Testimony</span>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
+              <span>Testimony / Note</span>
             </label>
           </div>
 
           <div class="field-wrap">
-            <label for="feedback-content" class="field-label">Your Message or Suggestion <span class="req">*</span></label>
-            <textarea id="feedback-content" rows="4" maxlength="3000" placeholder="Write your thoughts, suggestions, or corrections here…" required></textarea>
+            <label for="feedback-content" class="field-label">Your Observation or Note <span class="req">*</span></label>
+            <textarea id="feedback-content" rows="4" maxlength="3000" placeholder="Share your suggestion, note specific sermon titles if suggesting a correction, or leave a note for the team…" required></textarea>
             <div class="char-indicator"><span id="char-count">0</span> / 3000</div>
           </div>
 
           <div class="field-wrap">
-            <label for="feedback-contact" class="field-label">Name or Contact <small class="opt">(Optional — leave blank for 100% anonymous)</small></label>
-            <input type="text" id="feedback-contact" maxlength="150" placeholder="e.g. Bro David or david@example.com">
-            <p class="privacy-note">🔒 Submissions are 100% anonymous by default. You only need to provide contact info if you would like pastoral follow-up.</p>
+            <label for="feedback-contact" class="field-label">Your Name or Contact <small class="opt">(Optional)</small></label>
+            <input type="text" id="feedback-contact" maxlength="150" placeholder="e.g. David Emmanuel or david@example.com">
+            <p class="privacy-note">Submissions are private and anonymous by default. Add your contact only if you would welcome a pastoral response.</p>
           </div>
 
           <div id="feedback-form-error" class="form-alert error" hidden></div>
@@ -142,17 +145,19 @@
           <div class="sheet-actions">
             <button type="button" class="sheet-btn secondary" id="cancel-feedback-btn">Cancel</button>
             <button type="submit" class="sheet-btn primary" id="send-feedback-btn">
-              <span class="btn-text">Send to Pastoral Team</span>
+              <span class="btn-text">Submit to Ministry Team</span>
               <span class="sheet-spinner" hidden></span>
             </button>
           </div>
         </form>
 
         <div id="feedback-success-state" class="modal-success-state" hidden>
-          <div class="success-gem">🕊️</div>
-          <h3>Thank You!</h3>
-          <p>Your thoughts have been received with love and appreciation. May God continually bless and keep you!</p>
-          <button type="button" class="sheet-btn primary" id="feedback-done-btn">Back to Chat</button>
+          <div class="success-seal">
+            <span class="seal-mark">✦</span>
+          </div>
+          <h3>Received with Gratitude</h3>
+          <p>Your note has been received by the ministry team and will be reviewed with prayerful care. Thank you for helping strengthen this resource.</p>
+          <button type="button" class="sheet-btn primary" id="feedback-done-btn">Return to Study</button>
         </div>
       </div>
     </div>
@@ -242,7 +247,7 @@
     </div>
   </div>
 
-  <script src="/web/chat-stream.js?v=20261024a" defer></script>
-  <script src="/web/app.js?v=20261024a" defer></script>
+  <script src="/web/chat-stream.js?v=20261024b" defer></script>
+  <script src="/web/app.js?v=20261024b" defer></script>
 </body>
 </html>
