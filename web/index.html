@@ -7,7 +7,7 @@
   <meta name="description" content="Explore Pastor Niyi Adetiloye’s teachings through sermon-grounded answers.">
   <title>Pastor Niyi AI</title>
   <link rel="icon" type="image/svg+xml" href="/assets/bible-favicon.svg?v=1">
-  <link rel="stylesheet" href="/web/styles.css?v=20261024c">
+  <link rel="stylesheet" href="/web/styles.css?v=20261024d">
   <!-- Google Identity Services for Option B Google Sign-In -->
   <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
@@ -168,10 +168,9 @@
     <div class="modal-sheet">
       <div class="modal-sheet-header">
         <div class="modal-title-wrap">
-          <div class="modal-gem">🔖</div>
           <div>
-            <h2 id="bookmarks-title">Saved Sermons & Messages</h2>
-            <p class="modal-subtitle">Teachings and sermon links saved to your account.</p>
+            <h2 id="bookmarks-title">Saved Sermons & Teachings</h2>
+            <p class="modal-subtitle">Your bookmarked messages and study references.</p>
           </div>
         </div>
         <button type="button" class="sheet-close" id="close-bookmarks-btn" aria-label="Close modal">✕</button>
@@ -179,9 +178,9 @@
 
       <div class="modal-sheet-body">
         <div id="bookmarks-empty" class="bookmarks-empty-state" hidden>
-          <span class="empty-icon">📭</span>
+          <svg class="empty-svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#8fa095" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg>
           <h4>No saved sermons yet</h4>
-          <p>When listening to or reading sermon answers, click "Save" to keep them handy here.</p>
+          <p>When exploring teachings, save sermon citations to keep them handy here.</p>
         </div>
         <div id="bookmarks-list" class="bookmarks-list"></div>
       </div>
@@ -193,10 +192,9 @@
     <div class="modal-sheet">
       <div class="modal-sheet-header">
         <div class="modal-title-wrap">
-          <div class="modal-gem">✦</div>
           <div>
             <h2 id="auth-modal-title">Member Sign In</h2>
-            <p class="modal-subtitle">Save your sermon bookmarks, notes, and study history.</p>
+            <p class="modal-subtitle">Sign in to keep your sermon bookmarks and study notes synced across devices.</p>
           </div>
         </div>
         <button type="button" class="sheet-close" id="close-auth-btn" aria-label="Close modal">✕</button>
@@ -212,7 +210,7 @@
           <div class="field-wrap">
             <label for="member-name" class="field-label">Your Name <small class="opt">(Optional)</small></label>
             <input type="text" id="member-name" placeholder="e.g. David Emmanuel">
-            <p class="privacy-note">🔒 Passwordless access: bookmarks and sermon notes will be securely tied to your email profile.</p>
+            <p class="privacy-note">Passwordless access: bookmarks and sermon notes are securely tied to your email profile.</p>
           </div>
 
           <div id="auth-error-alert" class="form-alert error" hidden></div>
@@ -247,7 +245,7 @@
     </div>
   </div>
 
-  <script src="/web/chat-stream.js?v=20261024c" defer></script>
-  <script src="/web/app.js?v=20261024c" defer></script>
+  <script src="/web/chat-stream.js?v=20261024d" defer></script>
+  <script src="/web/app.js?v=20261024d" defer></script>
 </body>
 </html>

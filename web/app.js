@@ -695,6 +695,7 @@ window.submitMemberLogin = async function() {
     setUserToken(data.token);
     showSignedInUI(data.user);
     closeAuthModal();
+    showToast(`Welcome, ${data.user.name || 'Member'}!`);
   } catch (err) {
     if (authErrorAlert) {
       authErrorAlert.textContent = err.message;
@@ -774,11 +775,20 @@ async function handleGoogleCredential(credential) {
     if (data.ok && data.token && data.user) {
       setUserToken(data.token);
       showSignedInUI(data.user);
+      closeAuthModal();
+      showToast(`Welcome, ${data.user.name || 'Member'}! Signed in with Google.`);
     } else {
-      alert('Sign in could not be completed.');
+      if (authErrorAlert) {
+        authErrorAlert.textContent = data.detail || 'Sign in could not be completed.';
+        authErrorAlert.hidden = false;
+      }
     }
   } catch (err) {
     console.error('Auth error:', err);
+    if (authErrorAlert) {
+      authErrorAlert.textContent = 'Network error during sign-in. Please try again.';
+      authErrorAlert.hidden = false;
+    }
   }
 }
 
@@ -803,4 +813,19 @@ function escapeHTML(str) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
+}
+
+
+// Toast notification helper
+function showToast(message) {
+  let toast = document.getElementById('app-toast');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = 'app-toast';
+    toast.className = 'app-toast';
+    document.body.append(toast);
+  }
+  toast.textContent = message;
+  toast.classList.add('visible');
+  setTimeout(() => toast.classList.remove('visible'), 3200);
 }
