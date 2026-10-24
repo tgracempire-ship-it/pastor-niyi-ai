@@ -11,6 +11,42 @@ let busy = false;
 let activeThreadId = null;
 let activeThreadTitle = 'Current Study Session';
 
+// --- Active Study Session Bar & Thread UI ---
+const activeStudyBar = document.getElementById('active-study-bar');
+const activeStudyTitle = document.getElementById('active-study-title');
+const saveThreadBtn = document.getElementById('save-thread-btn');
+const saveThreadLabel = document.getElementById('save-thread-label');
+const newChatBtn = document.getElementById('new-chat-btn');
+const openHistoryBtn = document.getElementById('open-history-btn');
+const closeHistoryBtn = document.getElementById('close-history-btn');
+const historyModal = document.getElementById('history-modal');
+const historyList = document.getElementById('history-list');
+const historyEmpty = document.getElementById('history-empty');
+const historyGuestNotice = document.getElementById('history-guest-notice');
+const historySigninBtn = document.getElementById('history-signin-btn');
+const historyCountBadge = document.getElementById('history-count-badge');
+const userThreadsCount = document.getElementById('user-threads-count');
+const dropdownHistoryBtn = document.getElementById('dropdown-history-btn');
+
+function updateStudyBar() {
+  if (!activeStudyBar) return;
+  if (history.length > 0) {
+    activeStudyBar.hidden = false;
+    if (activeStudyTitle) {
+      if (activeThreadTitle && activeThreadTitle !== 'Current Study Session') {
+        activeStudyTitle.textContent = activeThreadTitle;
+      } else {
+        const firstUserTurn = history.find(t => t.role === 'user');
+        const candidate = firstUserTurn ? firstUserTurn.content.slice(0, 50) + (firstUserTurn.content.length > 50 ? '…' : '') : 'Current Study Session';
+        activeStudyTitle.textContent = candidate;
+      }
+    }
+  } else {
+    activeStudyBar.hidden = true;
+  }
+}
+
+
 
 function cleanMarkdown(text) {
   return String(text || '')
@@ -325,40 +361,6 @@ if (history.length) {
 
 
 
-// --- Active Study Session Bar & Thread UI ---
-const activeStudyBar = document.getElementById('active-study-bar');
-const activeStudyTitle = document.getElementById('active-study-title');
-const saveThreadBtn = document.getElementById('save-thread-btn');
-const saveThreadLabel = document.getElementById('save-thread-label');
-const newChatBtn = document.getElementById('new-chat-btn');
-const openHistoryBtn = document.getElementById('open-history-btn');
-const closeHistoryBtn = document.getElementById('close-history-btn');
-const historyModal = document.getElementById('history-modal');
-const historyList = document.getElementById('history-list');
-const historyEmpty = document.getElementById('history-empty');
-const historyGuestNotice = document.getElementById('history-guest-notice');
-const historySigninBtn = document.getElementById('history-signin-btn');
-const historyCountBadge = document.getElementById('history-count-badge');
-const userThreadsCount = document.getElementById('user-threads-count');
-const dropdownHistoryBtn = document.getElementById('dropdown-history-btn');
-
-function updateStudyBar() {
-  if (!activeStudyBar) return;
-  if (history.length > 0) {
-    activeStudyBar.hidden = false;
-    if (activeStudyTitle) {
-      if (activeThreadTitle && activeThreadTitle !== 'Current Study Session') {
-        activeStudyTitle.textContent = activeThreadTitle;
-      } else {
-        const firstUserTurn = history.find(t => t.role === 'user');
-        const candidate = firstUserTurn ? firstUserTurn.content.slice(0, 50) + (firstUserTurn.content.length > 50 ? '…' : '') : 'Current Study Session';
-        activeStudyTitle.textContent = candidate;
-      }
-    }
-  } else {
-    activeStudyBar.hidden = true;
-  }
-}
 
 function startNewStudy() {
   history = [];
