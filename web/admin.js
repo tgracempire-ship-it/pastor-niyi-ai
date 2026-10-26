@@ -37,6 +37,7 @@ const statOutboundClicks = document.getElementById('stat-outbound-clicks');
 const statOutboundBreakdown = document.getElementById('stat-outbound-breakdown');
 
 const inflowChart = document.getElementById('inflow-chart');
+const dailyTableBody = document.getElementById('daily-table-body');
 const topicsList = document.getElementById('topics-list');
 const activityFeed = document.getElementById('activity-feed');
 
@@ -235,12 +236,56 @@ function renderAnalyticsData(data) {
 
   // 2. Render 14-Day Inflow Activity Chart
   renderInflowChart(data.chart_days || []);
+  renderDailyTable(data.chart_days || []);
 
   // 3. Render Top Spiritual Topics
   renderTopTopics(data.top_topics || []);
 
   // 4. Render Activity Feed
   renderActivityFeed(data.recent_activity || []);
+}
+
+
+function renderDailyTable(days) {
+  if (!dailyTableBody) return;
+  if (!days.length) {
+    dailyTableBody.innerHTML = '<tr><td colspan="7" style="text-align:center; color:var(--text-muted); padding:20px;">No daily history recorded yet</td></tr>';
+    return;
+  }
+
+  // Show newest days first in the table
+  const reversedDays = [...days].reverse();
+  const todayStr = new Date().toISOString().slice(0, 10);
+
+  dailyTableBody.innerHTML = reversedDays.map(d => {
+    const isToday = d.date === todayStr;
+    const visitors = d.visitors || 0;
+    const pageviews = d.pageviews || 0;
+    const chats = d.chats || 0;
+    const tgClicks = d.telegram_clicks || 0;
+    const ytClicks = d.youtube_clicks || 0;
+    
+    // Questions per visitor ratio
+    const ratio = visitors > 0 ? (chats / visitors).toFixed(1) : (chats > 0 ? chats : '0.0');
+    const isHighEngagement = Number(ratio) >= 1.5;
+
+    return `
+      <tr class="${isToday ? 'today-row' : ''}">
+        <td class="date-cell">
+          <span>${escapeHTML(d.label)}</span>
+          ${isToday ? '<span class="today-pill">TODAY</span>' : ''}
+        </td>
+        <td class="stat-num highlight-emerald">${visitors}</td>
+        <td class="stat-num">${pageviews}</td>
+        <td class="stat-num highlight-gold">${chats}</td>
+        <td class="stat-num">${tgClicks}</td>
+        <td class="stat-num">${ytClicks}</td>
+        <td>
+          <span class="ratio-badge ${isHighEngagement ? 'active' : ''}">${ratio} Qs / Visitor</span>
+        </td>
+      </tr>
+    `;
+  }).join('');
 }
 
 function renderInflowChart(days) {

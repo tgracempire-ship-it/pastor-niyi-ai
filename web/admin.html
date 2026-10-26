@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#08100d">
   <title>Executive Admin Console · Pastor Niyi AI</title>
   <link rel="icon" type="image/svg+xml" href="/assets/bible-favicon.svg?v=1">
-  <link rel="stylesheet" href="/web/admin.css?v=20261026_v4">
+  <link rel="stylesheet" href="/web/admin.css?v=20261026_v5">
 </head>
 <body>
   <!-- 1. LOGIN OVERLAY -->
@@ -166,6 +166,32 @@
         <div class="chart-container" id="inflow-chart">
           <!-- Filled dynamically by JavaScript -->
         </div>
+
+        <!-- DAILY BREAKDOWN TABLE -->
+        <div class="daily-table-wrap">
+          <div class="table-header-meta">
+            <h4>Daily Traffic & Outflow Audit Log</h4>
+            <span class="table-subtitle">Day-by-day record of visitors, questions asked, and sermon clicks</span>
+          </div>
+          <div class="table-responsive">
+            <table class="daily-table" id="daily-traffic-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Unique Visitors</th>
+                  <th>Pageviews</th>
+                  <th>Study Questions</th>
+                  <th>Telegram Clicks</th>
+                  <th>YouTube Clicks</th>
+                  <th>Engagement Ratio</th>
+                </tr>
+              </thead>
+              <tbody id="daily-table-body">
+                <!-- Dynamically populated -->
+              </tbody>
+            </table>
+          </div>
+        </div>
       </section>
 
       <!-- SPLIT ROW: TOP SPIRITUAL THEMES & RECENT ACTIVITY -->
@@ -305,6 +331,6 @@
     </div>
   </div>
 
-  <script src="/web/admin.js?v=20261026_v4"></script>
+  <script src="/web/admin.js?v=20261026_v5"></script>
 </body>
 </html>

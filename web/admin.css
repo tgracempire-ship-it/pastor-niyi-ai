@@ -964,3 +964,121 @@ body {
   .admin-header { flex-direction: column; align-items: flex-start; }
   .header-actions { width: 100%; justify-content: flex-start; }
 }
+
+
+/* Daily Traffic Table Styles */
+.daily-table-wrap {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.table-header-meta {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+
+.table-header-meta h4 {
+  font-family: 'Playfair Display', serif;
+  font-size: 16px;
+  font-weight: 600;
+  color: #fff;
+}
+
+.table-subtitle {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.table-responsive {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.daily-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  text-align: left;
+}
+
+.daily-table th {
+  padding: 10px 14px;
+  background: var(--bg-card-alt);
+  color: var(--text-sub);
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  font-size: 10px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.daily-table td {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--text-main);
+  white-space: nowrap;
+}
+
+.daily-table tbody tr {
+  transition: background 0.15s ease;
+}
+
+.daily-table tbody tr:hover {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.daily-table tbody tr.today-row {
+  background: rgba(212, 167, 76, 0.04);
+}
+
+.daily-table td.date-cell {
+  font-weight: 600;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.today-pill {
+  font-size: 9px;
+  font-weight: 800;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--gold-tint);
+  border: 1px solid var(--gold-border);
+  color: var(--gold);
+}
+
+.daily-table td.stat-num {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.daily-table td.stat-num.highlight-gold {
+  color: var(--gold);
+}
+
+.daily-table td.stat-num.highlight-emerald {
+  color: var(--emerald);
+}
+
+.ratio-badge {
+  display: inline-flex;
+  padding: 2px 7px;
+  border-radius: var(--radius-full);
+  font-size: 10px;
+  font-weight: 700;
+  background: var(--border-subtle);
+  color: var(--text-sub);
+}
+.ratio-badge.active {
+  background: var(--emerald-tint);
+  color: var(--emerald);
+  border: 1px solid var(--emerald-border);
+}
