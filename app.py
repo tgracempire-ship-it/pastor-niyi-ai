@@ -45,6 +45,8 @@ from auth_and_feedback import (
     get_user_thread,
     save_user_thread,
     remove_user_thread,
+    record_analytics_event,
+    get_analytics_dashboard_data,
 )
 
 APP_DIR = Path(__file__).resolve().parent
@@ -326,6 +328,10 @@ class UserThreadSaveRequest(BaseModel):
     id: Optional[str] = None
     title: Optional[str] = ""
     messages: list = Field(default_factory=list)
+
+class AnalyticsEventRequest(BaseModel):
+    type: str
+    data: Optional[dict] = Field(default_factory=dict)
 
 _rate_lock = threading.Lock()
 _rate_counts = {}
@@ -755,7 +761,8 @@ def answer_stream(question, hits, history, sermon_search_performed=True):
         client.close()
 
 @app.get("/")
-def home():
+def home(request: Request):
+    record_analytics_event("pageview", {"summary": "Landing page visit"}, get_client_ip(request))
     return FileResponse(WEB_DIR / "index.html")
 
 @app.get("/widget")
@@ -957,6 +964,7 @@ def get_thread_detail(thread_id: str, request: Request):
 def save_thread(payload: UserThreadSaveRequest, request: Request):
     user_id = require_user_id(request)
     thread = save_user_thread(user_id, payload.title or "", payload.messages, payload.id)
+    record_analytics_event("save_thread", {"title": payload.title, "summary": f"Study saved: {payload.title}"}, get_client_ip(request))
     return {"ok": True, "thread": thread}
 
 @app.delete("/api/user/threads/{thread_id}")
@@ -964,6 +972,18 @@ def delete_thread(thread_id: str, request: Request):
     user_id = require_user_id(request)
     threads = remove_user_thread(user_id, thread_id)
     return {"ok": True, "threads": threads}
+
+@app.get("/api/admin/analytics")
+def admin_analytics(request: Request):
+    require_admin(request)
+    return get_analytics_dashboard_data()
+
+@app.post("/api/analytics/event")
+def track_event(payload: AnalyticsEventRequest, request: Request):
+    client_ip = get_client_ip(request)
+    record_analytics_event(payload.type, payload.data or {}, client_ip)
+    return {"ok": True}
+
 
 def sse_event(name, payload):
     data = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
@@ -999,6 +1019,7 @@ def chat_stream(payload: ChatRequest, request: Request):
             print(f"[chat-timing] search_skipped=social total_ms={int((time.perf_counter() - request_started) * 1000)}")
             yield sse_event("done", {})
             return
+        record_analytics_event("chat", {"query": payload.message.strip(), "summary": payload.message.strip()[:80]}, get_client_ip(request))
         search_sermons, route_reason = should_search_sermons(payload.message, history)
         hits = []
         try:
@@ -1061,6 +1082,7 @@ def chat(payload: ChatRequest, request: Request):
     if quick_reply:
         return {"answer": quick_reply, "sources": []}
     try:
+        record_analytics_event("chat", {"query": payload.message.strip(), "summary": payload.message.strip()[:80]}, get_client_ip(request))
         search_sermons, route_reason = should_search_sermons(payload.message, history)
         hits = []
         if search_sermons:

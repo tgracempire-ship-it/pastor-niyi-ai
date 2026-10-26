@@ -1,13 +1,13 @@
 /**
- * Pastor Niyi AI - Executive Admin Console
- * Secure feedback management, password change, and KPI monitoring.
+ * Pastor Niyi AI · Executive Admin Console
+ * Ministerial Intelligence, Traffic Inflow, Questions Telemetry & Feedback Management.
  */
 
 const STORAGE_KEY = 'pastor_ai_admin_token';
+let currentMainView = 'analytics'; // 'analytics' or 'feedbacks'
 let currentCategory = 'all';
 let currentStatus = 'new';
 let searchDebounceTimer = null;
-let cachedStats = null;
 
 // DOM Elements
 const loginView = document.getElementById('login-view');
@@ -18,12 +18,29 @@ const loginBtn = document.getElementById('login-btn');
 const loginError = document.getElementById('login-error');
 const defaultPwdBadge = document.getElementById('default-pwd-badge');
 
-const kpiTotal = document.getElementById('kpi-total');
-const kpiNew = document.getElementById('kpi-new');
-const kpiSuggestions = document.getElementById('kpi-suggestions');
-const kpiSermons = document.getElementById('kpi-sermons');
-const kpiBugs = document.getElementById('kpi-bugs');
+// Main view sections
+const analyticsSection = document.getElementById('analytics-section');
+const feedbacksSection = document.getElementById('feedbacks-section');
+const viewAnalyticsBtn = document.getElementById('view-analytics-btn');
+const viewFeedbacksBtn = document.getElementById('view-feedbacks-btn');
+const viewFeedbackCount = document.getElementById('view-feedback-count');
 
+// Analytics KPI elements
+const statTodayVisitors = document.getElementById('stat-today-visitors');
+const statTodayChatsSub = document.getElementById('stat-today-chats-sub');
+const statLifetimeChats = document.getElementById('stat-lifetime-chats');
+const statTotalMembers = document.getElementById('stat-total-members');
+const statMemberBreakdown = document.getElementById('stat-member-breakdown');
+const statSavedThreads = document.getElementById('stat-saved-threads');
+const statBookmarksSub = document.getElementById('stat-bookmarks-sub');
+const statOutboundClicks = document.getElementById('stat-outbound-clicks');
+const statOutboundBreakdown = document.getElementById('stat-outbound-breakdown');
+
+const inflowChart = document.getElementById('inflow-chart');
+const topicsList = document.getElementById('topics-list');
+const activityFeed = document.getElementById('activity-feed');
+
+// Feedback elements
 const feedbacksList = document.getElementById('feedbacks-list');
 const loadingState = document.getElementById('loading-state');
 const emptyState = document.getElementById('empty-state');
@@ -31,6 +48,7 @@ const statusFilter = document.getElementById('status-filter');
 const categoryTabs = document.getElementById('category-tabs');
 const searchInput = document.getElementById('search-input');
 
+// Password Modal Elements
 const pwdModal = document.getElementById('pwd-modal');
 const oldPwdInput = document.getElementById('old-pwd');
 const newPwdInput = document.getElementById('new-pwd');
@@ -80,6 +98,28 @@ function showDashboard() {
   dashboardView.hidden = false;
 }
 
+// --- View Switcher ---
+function switchMainView(view) {
+  currentMainView = view;
+  if (view === 'analytics') {
+    viewAnalyticsBtn.classList.add('active');
+    viewAnalyticsBtn.setAttribute('aria-selected', 'true');
+    viewFeedbacksBtn.classList.remove('active');
+    viewFeedbacksBtn.setAttribute('aria-selected', 'false');
+    analyticsSection.hidden = false;
+    feedbacksSection.hidden = true;
+    loadAnalytics();
+  } else {
+    viewAnalyticsBtn.classList.remove('active');
+    viewAnalyticsBtn.setAttribute('aria-selected', 'false');
+    viewFeedbacksBtn.classList.add('active');
+    viewFeedbacksBtn.setAttribute('aria-selected', 'true');
+    analyticsSection.hidden = true;
+    feedbacksSection.hidden = false;
+    loadFeedbacks();
+  }
+}
+
 // --- Auth Handlers ---
 async function handleAdminLogin() {
   const password = adminPasswordInput.value.trim();
@@ -109,6 +149,7 @@ async function handleAdminLogin() {
       defaultPwdBadge.hidden = true;
     }
 
+    await loadAnalytics();
     await loadFeedbacks();
   } catch (err) {
     loginError.textContent = err.message;
@@ -120,9 +161,6 @@ async function handleAdminLogin() {
 
 async function verifySessionAndLoad(token) {
   showDashboard();
-  loadingState.hidden = false;
-  emptyState.hidden = true;
-
   try {
     const res = await fetch('/api/admin/feedbacks?status=new', {
       headers: { 'Authorization': `Bearer ${token}` }
@@ -141,62 +179,168 @@ async function verifySessionAndLoad(token) {
       defaultPwdBadge.hidden = true;
     }
 
-    updateKPIs(data.stats);
-    renderFeedbacksList(data.feedbacks || []);
+    loadAnalytics();
+    renderFeedbacksData(data);
   } catch (err) {
-    console.error('Session verification failed:', err);
-    clearAdminToken();
-    showLogin();
-  } finally {
-    loadingState.hidden = true;
+    console.error('Session load failed:', err);
   }
 }
 
 function handleAdminLogout() {
-  if (confirm('Are you sure you want to sign out from the Admin Console?')) {
-    clearAdminToken();
-    showLogin();
+  clearAdminToken();
+  showLogin();
+}
+
+// --- Analytics Loading & Rendering ---
+async function loadAnalytics() {
+  const token = getAdminToken();
+  if (!token) return showLogin();
+
+  try {
+    const res = await fetch('/api/admin/analytics', {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    if (res.status === 401) {
+      clearAdminToken();
+      return showLogin();
+    }
+    const data = await res.json();
+    if (data.ok) {
+      renderAnalyticsData(data);
+    }
+  } catch (err) {
+    console.error('Failed to load analytics:', err);
   }
 }
 
-// --- Category Tabs ---
-function setupTabs() {
-  if (!categoryTabs) return;
-  categoryTabs.querySelectorAll('.tab').forEach(tab => {
-    tab.addEventListener('click', () => {
-      categoryTabs.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-      tab.classList.add('active');
-      currentCategory = tab.dataset.cat || 'all';
-      loadFeedbacks();
-    });
-  });
+function renderAnalyticsData(data) {
+  const s = data.summary || {};
+  
+  // 1. KPI Cards
+  if (statTodayVisitors) statTodayVisitors.textContent = s.today_visitors || 0;
+  if (statTodayChatsSub) statTodayChatsSub.textContent = `${s.today_chats || 0} study questions asked today`;
+  
+  if (statLifetimeChats) statLifetimeChats.textContent = s.total_lifetime_chats || 0;
+  if (statTotalMembers) statTotalMembers.textContent = s.total_members || 0;
+  if (statMemberBreakdown) statMemberBreakdown.textContent = `${s.google_members || 0} Google · ${s.email_members || 0} Email Profiles`;
+  
+  if (statSavedThreads) statSavedThreads.textContent = s.total_saved_threads || 0;
+  if (statBookmarksSub) statBookmarksSub.textContent = `${s.total_bookmarks || 0} bookmarked teachings`;
+  
+  const totalOutflow = (s.telegram_clicks || 0) + (s.youtube_clicks || 0);
+  if (statOutboundClicks) statOutboundClicks.textContent = totalOutflow;
+  if (statOutboundBreakdown) statOutboundBreakdown.textContent = `${s.telegram_clicks || 0} Telegram · ${s.youtube_clicks || 0} YouTube`;
+
+  if (viewFeedbackCount) viewFeedbackCount.textContent = s.total_feedbacks || 0;
+
+  // 2. Render 14-Day Inflow Activity Chart
+  renderInflowChart(data.chart_days || []);
+
+  // 3. Render Top Spiritual Topics
+  renderTopTopics(data.top_topics || []);
+
+  // 4. Render Activity Feed
+  renderActivityFeed(data.recent_activity || []);
 }
 
-function handleSearchInput(query) {
-  clearTimeout(searchDebounceTimer);
-  searchDebounceTimer = setTimeout(() => {
-    loadFeedbacks();
-  }, 350);
-}
-
-// --- Data Fetching & KPIs ---
-async function loadFeedbacks() {
-  const token = getAdminToken();
-  if (!token) {
-    showLogin();
+function renderInflowChart(days) {
+  if (!inflowChart) return;
+  if (!days.length) {
+    inflowChart.innerHTML = '<div style="margin: auto; color: var(--text-muted); font-size: 12px;">No traffic recorded yet</div>';
     return;
   }
 
-  const status = statusFilter ? statusFilter.value : 'all';
-  const search = searchInput ? searchInput.value.trim() : '';
-  const params = new URLSearchParams();
-  if (status) params.set('status', status);
-  if (currentCategory && currentCategory !== 'all') params.set('category', currentCategory);
-  if (search) params.set('search', search);
+  const maxVal = Math.max(1, ...days.map(d => Math.max(d.chats || 0, d.visitors || 0)));
+
+  inflowChart.innerHTML = days.map(d => {
+    const chatH = Math.round(((d.chats || 0) / maxVal) * 100);
+    const visH = Math.round(((d.visitors || 0) / maxVal) * 100);
+
+    return `
+      <div class="chart-bar-col" title="${escapeHTML(d.label)}: ${d.chats || 0} questions, ${d.visitors || 0} visitors">
+        <div class="bar-stack">
+          <div class="bar-segment chats" style="height: ${Math.max(chatH, 4)}%;"></div>
+          <div class="bar-segment visitors" style="height: ${Math.max(visH, 4)}%;"></div>
+        </div>
+        <span class="bar-date-label">${escapeHTML(d.label.split(' ')[1] || d.label)}</span>
+      </div>
+    `;
+  }).join('');
+}
+
+function renderTopTopics(topics) {
+  if (!topicsList) return;
+  if (!topics.length) {
+    topicsList.innerHTML = '<p style="color: var(--text-muted); font-size: 12px; margin: 12px 0;">Spiritual queries will appear here as church members interact with sermons.</p>';
+    return;
+  }
+
+  const maxCount = Math.max(1, ...topics.map(t => t.count));
+
+  topicsList.innerHTML = topics.map(t => {
+    const pct = Math.round((t.count / maxCount) * 100);
+    return `
+      <div class="topic-row">
+        <div class="topic-info">
+          <span class="topic-bullet"></span>
+          <span class="topic-name">${escapeHTML(t.topic)}</span>
+        </div>
+        <div class="topic-bar-wrap">
+          <div class="topic-bar-fill" style="width: ${pct}%;"></div>
+        </div>
+        <span class="topic-count">${t.count}</span>
+      </div>
+    `;
+  }).join('');
+}
+
+function renderActivityFeed(events) {
+  if (!activityFeed) return;
+  if (!events.length) {
+    activityFeed.innerHTML = '<p style="color: var(--text-muted); font-size: 12px; margin: 12px 0;">No ministerial interactions recorded yet today.</p>';
+    return;
+  }
+
+  activityFeed.innerHTML = events.map(e => {
+    const timeAgo = formatTimeAgo(e.time);
+    const typeLabel = e.type === 'chat' ? 'Question' : e.type === 'click' ? 'Media' : e.type === 'save_thread' ? 'Saved Study' : 'Page Visit';
+    return `
+      <div class="activity-item">
+        <span class="activity-badge ${escapeHTML(e.type)}">${typeLabel}</span>
+        <div class="activity-detail">
+          <div class="activity-summary">${escapeHTML(e.summary || e.detail || 'Interaction')}</div>
+          <div class="activity-time">${escapeHTML(timeAgo)}</div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function formatTimeAgo(iso) {
+  if (!iso) return '';
+  const diff = (Date.now() - new Date(iso).getTime()) / 1000;
+  if (diff < 60) return 'Just now';
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  return `${Math.floor(diff / 86400)}d ago`;
+}
+
+// --- Feedbacks Loading & Rendering ---
+async function loadFeedbacks() {
+  const token = getAdminToken();
+  if (!token) return showLogin();
 
   loadingState.hidden = false;
   emptyState.hidden = true;
   feedbacksList.innerHTML = '';
+
+  const status = statusFilter?.value || 'new';
+  const search = searchInput?.value?.trim() || '';
+
+  const params = new URLSearchParams();
+  if (status !== 'all') params.append('status', status);
+  if (currentCategory !== 'all') params.append('category', currentCategory);
+  if (search) params.append('search', search);
 
   try {
     const res = await fetch(`/api/admin/feedbacks?${params.toString()}`, {
@@ -205,119 +349,76 @@ async function loadFeedbacks() {
 
     if (res.status === 401) {
       clearAdminToken();
-      showLogin();
-      return;
+      return showLogin();
     }
 
     const data = await res.json();
-    if (data.stats) updateKPIs(data.stats);
-    if (typeof data.is_default_password === 'boolean') {
-      defaultPwdBadge.hidden = !data.is_default_password;
-    }
-
-    renderFeedbacksList(data.feedbacks || []);
+    renderFeedbacksData(data);
   } catch (err) {
     console.error('Failed to load feedbacks:', err);
-    feedbacksList.innerHTML = `<div class="alert error full-width">Error loading feedback: ${err.message}</div>`;
   } finally {
     loadingState.hidden = true;
   }
 }
 
-function updateKPIs(stats) {
-  if (!stats) return;
-  cachedStats = stats;
-  kpiTotal.textContent = stats.total ?? 0;
-  kpiNew.textContent = stats.new ?? 0;
-  if (stats.by_category) {
-    kpiSuggestions.textContent = stats.by_category.suggestion ?? 0;
-    kpiSermons.textContent = stats.by_category.sermon ?? 0;
-    kpiBugs.textContent = stats.by_category.bug ?? 0;
-  }
-}
+function renderFeedbacksData(data) {
+  const feedbacks = data.feedbacks || [];
+  if (viewFeedbackCount) viewFeedbackCount.textContent = data.stats?.total || feedbacks.length;
 
-// --- Rendering Feedback Cards ---
-function renderFeedbacksList(items) {
-  if (!items || items.length === 0) {
+  if (feedbacks.length === 0) {
     emptyState.hidden = false;
     feedbacksList.innerHTML = '';
     return;
   }
 
   emptyState.hidden = true;
-  feedbacksList.innerHTML = items.map(item => createFeedbackCardHTML(item)).join('');
+  feedbacksList.innerHTML = feedbacks.map(renderFeedbackCard).join('');
 }
 
-function createFeedbackCardHTML(fb) {
-  const timeFormatted = formatTime(fb.created_at);
-  const catLabel = getCategoryLabel(fb.category);
-  const statusBadge = getStatusBadge(fb.status);
-  const safeContent = escapeHTML(fb.content);
-  const safeContact = fb.contact ? escapeHTML(fb.contact) : '';
-  const safeContext = fb.context_question ? escapeHTML(fb.context_question) : '';
+function renderFeedbackCard(fb) {
+  const dateStr = fb.created_at ? new Date(fb.created_at).toLocaleDateString(undefined, {
+    month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit'
+  }) : '';
 
   const isStarred = fb.status === 'starred';
-  const isReviewed = fb.status === 'reviewed';
-  const isArchived = fb.status === 'archived';
 
   return `
-    <article class="feedback-card ${fb.status || 'new'}" id="card-${fb.id}">
-      <div class="card-head">
-        <div class="card-tags">
-          <span class="badge cat-${fb.category}">${catLabel}</span>
-          ${statusBadge}
+    <article class="feedback-card" id="fb-${escapeHTML(fb.id)}">
+      <div class="card-top">
+        <span class="cat-pill ${escapeHTML(fb.category || 'suggestion')}">${escapeHTML(fb.category || 'Suggestion')}</span>
+        <span class="status-badge ${escapeHTML(fb.status || 'new')}">${escapeHTML(fb.status || 'new')}</span>
+      </div>
+
+      <div class="feedback-body">${escapeHTML(fb.content || '')}</div>
+
+      ${fb.context_question ? `
+        <div class="context-box">
+          <strong>Context Query:</strong>
+          <p>${escapeHTML(fb.context_question)}</p>
         </div>
-        <time class="card-date" datetime="${fb.created_at}">${timeFormatted}</time>
-      </div>
+      ` : ''}
 
-      <div class="card-body">
-        <p class="feedback-text">${safeContent}</p>
-        ${safeContext ? `<div class="context-snippet"><strong>Context query:</strong> "${safeContext}"</div>` : ''}
-      </div>
-
-      <div class="card-foot">
-        <div class="contact-info">
-          ${safeContact ? `👤 <span class="contact-val">${safeContact}</span>` : '<span class="anon-label">🔒 Anonymous Member</span>'}
+      <div class="card-footer">
+        <div class="contact-meta">
+          <strong>${escapeHTML(fb.contact || 'Anonymous Member')}</strong>
+          <small>${escapeHTML(dateStr)}</small>
         </div>
 
         <div class="card-actions">
-          <button type="button" class="action-btn star-btn ${isStarred ? 'active' : ''}" 
-                  onclick="updateFeedbackStatus('${fb.id}', '${isStarred ? 'reviewed' : 'starred'}')"
-                  title="${isStarred ? 'Unstar' : 'Star this suggestion'}">
+          ${fb.status === 'new' ? `
+            <button type="button" class="action-btn" onclick="updateStatus('${escapeHTML(fb.id)}', 'reviewed')" title="Mark Reviewed">✓ Review</button>
+          ` : ''}
+          <button type="button" class="action-btn" onclick="updateStatus('${escapeHTML(fb.id)}', '${isStarred ? 'reviewed' : 'starred'}')" title="Star Item">
             ${isStarred ? '★ Starred' : '☆ Star'}
           </button>
-
-          ${!isReviewed ? `
-            <button type="button" class="action-btn review-btn" 
-                    onclick="updateFeedbackStatus('${fb.id}', 'reviewed')" title="Mark as reviewed">
-              ✓ Mark Reviewed
-            </button>
-          ` : `
-            <button type="button" class="action-btn reviewed-done" 
-                    onclick="updateFeedbackStatus('${fb.id}', 'new')" title="Re-open to New">
-              ↺ Re-open
-            </button>
-          `}
-
-          ${!isArchived ? `
-            <button type="button" class="action-btn archive-btn" 
-                    onclick="updateFeedbackStatus('${fb.id}', 'archived')" title="Archive">
-              📁 Archive
-            </button>
-          ` : ''}
-
-          <button type="button" class="action-btn delete-btn" 
-                  onclick="confirmDeleteFeedback('${fb.id}')" title="Permanently delete">
-            🗑
-          </button>
+          <button type="button" class="action-btn del" onclick="deleteFeedbackItem('${escapeHTML(fb.id)}')" title="Delete Item">🗑</button>
         </div>
       </div>
     </article>
   `;
 }
 
-// --- Item Actions ---
-async function updateFeedbackStatus(id, newStatus) {
+async function updateStatus(id, newStatus) {
   const token = getAdminToken();
   if (!token) return showLogin();
 
@@ -330,24 +431,16 @@ async function updateFeedbackStatus(id, newStatus) {
       },
       body: JSON.stringify({ id, status: newStatus })
     });
-
-    const data = await res.json();
-    if (!res.ok || !data.ok) {
-      throw new Error(data.detail || 'Could not update status');
+    if (res.ok) {
+      loadFeedbacks();
     }
-
-    // Refresh feedbacks to keep counts and filters in sync
-    await loadFeedbacks();
   } catch (err) {
-    alert('Action failed: ' + err.message);
+    console.error('Update status error:', err);
   }
 }
 
-async function confirmDeleteFeedback(id) {
-  if (!confirm('Are you sure you want to delete this feedback entry? This cannot be undone.')) {
-    return;
-  }
-
+async function deleteFeedbackItem(id) {
+  if (!confirm('Are you sure you want to permanently delete this observation?')) return;
   const token = getAdminToken();
   if (!token) return showLogin();
 
@@ -356,35 +449,42 @@ async function confirmDeleteFeedback(id) {
       method: 'DELETE',
       headers: { 'Authorization': `Bearer ${token}` }
     });
-
-    const data = await res.json();
-    if (!res.ok || !data.ok) {
-      throw new Error(data.detail || 'Could not delete feedback');
-    }
-
-    // Animate and remove card
-    const card = document.getElementById(`card-${id}`);
-    if (card) {
-      card.style.opacity = '0';
-      card.style.transform = 'scale(0.95)';
-      setTimeout(() => loadFeedbacks(), 200);
-    } else {
+    if (res.ok) {
       loadFeedbacks();
     }
   } catch (err) {
-    alert('Delete failed: ' + err.message);
+    console.error('Delete feedback error:', err);
   }
 }
 
-// --- CSV Export ---
 function exportFeedbacksCSV() {
   const token = getAdminToken();
   if (!token) return showLogin();
   window.location.href = `/api/admin/feedbacks/export?token=${encodeURIComponent(token)}`;
 }
 
+// --- Category Tabs & Search ---
+function setupTabs() {
+  categoryTabs?.addEventListener('click', (e) => {
+    const btn = e.target.closest('.tab');
+    if (!btn) return;
+    categoryTabs.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    btn.classList.add('active');
+    currentCategory = btn.dataset.cat || 'all';
+    loadFeedbacks();
+  });
+}
+
+function handleSearchInput(val) {
+  clearTimeout(searchDebounceTimer);
+  searchDebounceTimer = setTimeout(() => {
+    loadFeedbacks();
+  }, 250);
+}
+
 // --- Change Password Modal ---
 function openChangePasswordModal() {
+  if (!pwdModal) return;
   pwdModal.hidden = false;
   oldPwdInput.value = '';
   newPwdInput.value = '';
@@ -395,71 +495,49 @@ function openChangePasswordModal() {
 }
 
 function closeChangePasswordModal() {
-  pwdModal.hidden = true;
+  if (pwdModal) pwdModal.hidden = true;
 }
 
-// Close modal on backdrop click or Escape
 pwdModal?.addEventListener('click', (e) => {
   if (e.target === pwdModal) closeChangePasswordModal();
 });
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && !pwdModal.hidden) closeChangePasswordModal();
-});
 
 async function handleChangePassword() {
-  const oldPwd = oldPwdInput.value;
-  const newPwd = newPwdInput.value;
-  const confirmPwd = confirmPwdInput.value;
+  const oldPwd = oldPwdInput.value.trim();
+  const newPwd = newPwdInput.value.trim();
+  const confPwd = confirmPwdInput.value.trim();
 
+  if (newPwd !== confPwd) {
+    changePwdError.textContent = 'New passwords do not match.';
+    changePwdError.hidden = false;
+    return;
+  }
+
+  setLoading(savePwdBtn, true, 'Updating...');
   changePwdError.hidden = true;
   changePwdSuccess.hidden = true;
 
-  if (newPwd.length < 4) {
-    changePwdError.textContent = 'New password must be at least 4 characters long.';
-    changePwdError.hidden = false;
-    return;
-  }
-
-  if (newPwd !== confirmPwd) {
-    changePwdError.textContent = 'New passwords do not match. Please verify.';
-    changePwdError.hidden = false;
-    return;
-  }
-
-  const token = getAdminToken();
-  setLoading(savePwdBtn, true, 'Updating...');
-
   try {
+    const token = getAdminToken();
     const res = await fetch('/api/admin/change-password', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`
       },
-      body: JSON.stringify({
-        old_password: oldPwd,
-        new_password: newPwd
-      })
+      body: JSON.stringify({ old_password: oldPwd, new_password: newPwd })
     });
 
     const data = await res.json();
     if (!res.ok || !data.ok) {
-      throw new Error(data.detail || 'Password change failed.');
+      throw new Error(data.detail || 'Could not change password.');
     }
 
-    if (data.token) {
-      setAdminToken(data.token, true);
-    }
-
-    changePwdSuccess.textContent = 'Password updated successfully! Keep it safe.';
-    changePwdSuccess.hidden = false;
+    if (data.token) setAdminToken(data.token, true);
     defaultPwdBadge.hidden = true;
-
-    setTimeout(() => {
-      closeChangePasswordModal();
-      showDashboard();
-      loadFeedbacks();
-    }, 1200);
+    changePwdSuccess.textContent = 'Password updated successfully!';
+    changePwdSuccess.hidden = false;
+    setTimeout(() => closeChangePasswordModal(), 1500);
   } catch (err) {
     changePwdError.textContent = err.message;
     changePwdError.hidden = false;
@@ -467,79 +545,6 @@ async function handleChangePassword() {
     setLoading(savePwdBtn, false, 'Update Password');
   }
 }
-
-// --- Helpers ---
-function togglePasswordVisibility(inputId, btn) {
-  const input = document.getElementById(inputId);
-  if (!input) return;
-  if (input.type === 'password') {
-    input.type = 'text';
-    btn.textContent = '🙈';
-  } else {
-    input.type = 'password';
-    btn.textContent = '👁';
-  }
-}
-
-function setLoading(btn, isLoading, text) {
-  if (!btn) return;
-  btn.disabled = isLoading;
-  const textEl = btn.querySelector('.btn-text');
-  const spinner = btn.querySelector('.spinner');
-  if (textEl) textEl.textContent = text;
-  if (spinner) spinner.hidden = !isLoading;
-}
-
-function getCategoryLabel(cat) {
-  switch (cat) {
-    case 'suggestion': return '💡 Suggestion';
-    case 'sermon': return '📖 Sermon Quality';
-    case 'bug': return '🐛 Bug Report';
-    case 'testimony': return '❤️ Testimony';
-    case 'rating': return '⭐ Rating';
-    default: return '💬 Feedback';
-  }
-}
-
-function getStatusBadge(status) {
-  switch (status) {
-    case 'new': return '<span class="status-badge new">New</span>';
-    case 'reviewed': return '<span class="status-badge reviewed">Reviewed</span>';
-    case 'starred': return '<span class="status-badge starred">⭐ Starred</span>';
-    case 'archived': return '<span class="status-badge archived">Archived</span>';
-    default: return '';
-  }
-}
-
-function formatTime(isoStr) {
-  if (!isoStr) return '';
-  try {
-    const d = new Date(isoStr);
-    const now = new Date();
-    const diffMs = now - d;
-    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-    
-    if (diffHours < 1) {
-      const diffMins = Math.max(1, Math.floor(diffMs / (1000 * 60)));
-      return `${diffMins}m ago`;
-    }
-    if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffHours < 48) return 'Yesterday';
-    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-  } catch (e) {
-    return isoStr;
-  }
-}
-
-function escapeHTML(str) {
-  return String(str || '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
-}
-
 
 // --- Google OAuth Modal ---
 const googleModal = document.getElementById('google-modal');
@@ -598,4 +603,35 @@ async function handleSaveGoogleClientId() {
   } finally {
     setLoading(saveGoogleBtn, false, 'Save Client ID');
   }
+}
+
+// Helper: Toggle Password Visibility
+function togglePasswordVisibility(inputId, btn) {
+  const el = document.getElementById(inputId);
+  if (!el) return;
+  if (el.type === 'password') {
+    el.type = 'text';
+    btn.style.color = 'var(--gold)';
+  } else {
+    el.type = 'password';
+    btn.style.color = 'var(--text-muted)';
+  }
+}
+
+function setLoading(btn, isLoading, text) {
+  if (!btn) return;
+  btn.disabled = isLoading;
+  const textSpan = btn.querySelector('.btn-text');
+  const spinner = btn.querySelector('.spinner');
+  if (textSpan) textSpan.textContent = text;
+  if (spinner) spinner.hidden = !isLoading;
+}
+
+function escapeHTML(str) {
+  return String(str || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
 }

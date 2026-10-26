@@ -7,7 +7,7 @@ import json
 import os
 import secrets
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -18,6 +18,7 @@ DATA_DIR.mkdir(parents=True, exist_ok=True)
 ADMIN_AUTH_FILE = DATA_DIR / "admin_auth.json"
 FEEDBACKS_FILE = DATA_DIR / "feedbacks.json"
 USERS_FILE = DATA_DIR / "users.json"
+ANALYTICS_FILE = DATA_DIR / "analytics.json"
 
 # ── Password Hashing Helpers ──────────────────────────────────────────────────
 
@@ -493,3 +494,184 @@ def set_google_client_id(client_id: str) -> bool:
     auth["google_client_id"] = str(client_id or "").strip()
     ADMIN_AUTH_FILE.write_text(json.dumps(auth, indent=2), encoding="utf-8")
     return True
+
+
+# ── Live Analytics & Traffic Inflow/Outflow Engine ──────────────────────────
+
+_analytics_lock = threading.Lock()
+
+def _load_analytics_raw() -> Dict[str, Any]:
+    if not ANALYTICS_FILE.is_file():
+        return {
+            "daily": {},
+            "recent_events": [],
+            "top_topics": {},
+            "link_clicks": {"telegram": 0, "youtube": 0},
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+    try:
+        return json.loads(ANALYTICS_FILE.read_text(encoding="utf-8"))
+    except Exception:
+        return {
+            "daily": {},
+            "recent_events": [],
+            "top_topics": {},
+            "link_clicks": {"telegram": 0, "youtube": 0},
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+
+def _save_analytics_raw(data: Dict[str, Any]):
+    _atomic_write_json(ANALYTICS_FILE, data)
+
+THEME_KEYWORDS = [
+    ("Faith & Trust", ["faith", "trust", "believ", "doubt", "fear"]),
+    ("Prayer & Fellowship", ["prayer", "pray", "fasting", "fellowship", "intercession"]),
+    ("The Devotional Life", ["devotion", "quiet time", "study the word", "scripture", "bible"]),
+    ("Mind Renewal & Thought Life", ["mind", "thought", "renew", "mental", "focus", "discipline"]),
+    ("Christian Profession & Words", ["profession", "confession", "homologia", "words", "tongue", "speak"]),
+    ("Wisdom & Guidance", ["wisdom", "guidance", "decision", "direction", "discernment", "lead"]),
+    ("Spiritual Growth & Fruit", ["growth", "mature", "fruit", "consecrat", "holiness", "flesh"]),
+    ("Work, Career & Calling", ["work", "career", "calling", "gift", "purpose", "business", "job"]),
+    ("Prosperity & Giving", ["money", "giving", "tithe", "wealth", "prosper", "financial"]),
+    ("Relationships & Marriage", ["marriage", "relationship", "spouse", "dating", "family", "parent"]),
+    ("Church & Headship", ["church", "headship", "pastor", "ministry", "serving", "landscape"]),
+]
+
+def classify_topics(text: str) -> List[str]:
+    lower = text.lower()
+    matched = []
+    for category, kw_list in THEME_KEYWORDS:
+        if any(kw in lower for kw in kw_list):
+            matched.append(category)
+    if not matched:
+        matched.append("General Spiritual Guidance")
+    return matched
+
+def record_analytics_event(event_type: str, data: Dict[str, Any], client_ip: str = ""):
+    """Safely log visitor sessions, chat questions, and media outbound clicks."""
+    with _analytics_lock:
+        analytics = _load_analytics_raw()
+        now_dt = datetime.now(timezone.utc)
+        today = now_dt.strftime("%Y-%m-%d")
+        now_iso = now_dt.isoformat()
+        
+        # Salted IP hash for unique daily visitor tracking without storing personal IP
+        salt = today.encode()
+        ip_hash = hashlib.sha256(salt + (client_ip or "anonymous").encode()).hexdigest()[:10]
+        
+        daily = analytics.setdefault("daily", {}).setdefault(today, {
+            "visitors": [],
+            "pageviews": 0,
+            "chats": 0,
+            "stream_tokens": 0,
+            "telegram_clicks": 0,
+            "youtube_clicks": 0,
+            "saves": 0,
+            "categories": {}
+        })
+        
+        if ip_hash not in daily["visitors"]:
+            daily["visitors"].append(ip_hash)
+            
+        if event_type == "pageview":
+            daily["pageviews"] = daily.get("pageviews", 0) + 1
+        elif event_type == "chat":
+            daily["chats"] = daily.get("chats", 0) + 1
+            query = data.get("query", "").strip()
+            if query:
+                topics = classify_topics(query)
+                for cat in topics:
+                    daily.setdefault("categories", {})[cat] = daily["categories"].get(cat, 0) + 1
+                    analytics.setdefault("top_topics", {})[cat] = analytics["top_topics"].get(cat, 0) + 1
+        elif event_type == "click":
+            link_type = data.get("link_type", "").lower()
+            if "youtube" in link_type:
+                daily["youtube_clicks"] = daily.get("youtube_clicks", 0) + 1
+                analytics.setdefault("link_clicks", {})["youtube"] = analytics["link_clicks"].get("youtube", 0) + 1
+            elif "telegram" in link_type:
+                daily["telegram_clicks"] = daily.get("telegram_clicks", 0) + 1
+                analytics.setdefault("link_clicks", {})["telegram"] = analytics["link_clicks"].get("telegram", 0) + 1
+        elif event_type == "save_thread":
+            daily["saves"] = daily.get("saves", 0) + 1
+            
+        # Recent activity stream (keep last 50 events)
+        recent = analytics.setdefault("recent_events", [])
+        recent.insert(0, {
+            "type": event_type,
+            "time": now_iso,
+            "summary": data.get("summary", ""),
+            "detail": data.get("detail", "")
+        })
+        analytics["recent_events"] = recent[:50]
+        
+        # Keep last 90 days in daily
+        if len(analytics["daily"]) > 90:
+            sorted_days = sorted(analytics["daily"].keys())
+            for d in sorted_days[:-90]:
+                del analytics["daily"][d]
+                
+        _save_analytics_raw(analytics)
+
+def get_analytics_dashboard_data() -> Dict[str, Any]:
+    with _analytics_lock:
+        analytics = _load_analytics_raw()
+        users = _load_users()
+        feedbacks = _load_feedbacks()
+        
+    now_dt = datetime.now(timezone.utc)
+    today = now_dt.strftime("%Y-%m-%d")
+    daily = analytics.get("daily", {})
+    
+    # Calculate daily chart data for past 14 days
+    last_14_days = []
+    for i in range(13, -1, -1):
+        d_str = (now_dt - timedelta(days=i)).strftime("%Y-%m-%d")
+        d_data = daily.get(d_str, {})
+        last_14_days.append({
+            "date": d_str,
+            "label": (now_dt - timedelta(days=i)).strftime("%b %d"),
+            "visitors": len(d_data.get("visitors", [])),
+            "pageviews": d_data.get("pageviews", 0),
+            "chats": d_data.get("chats", 0),
+            "telegram_clicks": d_data.get("telegram_clicks", 0),
+            "youtube_clicks": d_data.get("youtube_clicks", 0)
+        })
+        
+    today_data = daily.get(today, {})
+    total_lifetime_chats = sum(d.get("chats", 0) for d in daily.values())
+    total_lifetime_pageviews = sum(d.get("pageviews", 0) for d in daily.values())
+    total_lifetime_tg = sum(d.get("telegram_clicks", 0) for d in daily.values()) + analytics.get("link_clicks", {}).get("telegram", 0)
+    total_lifetime_yt = sum(d.get("youtube_clicks", 0) for d in daily.values()) + analytics.get("link_clicks", {}).get("youtube", 0)
+    
+    # Calculate members count & active saved threads
+    total_members = len(users)
+    google_members = sum(1 for u in users.values() if u.get("provider") == "google")
+    email_members = total_members - google_members
+    total_threads = sum(len(u.get("threads", [])) for u in users.values())
+    total_bookmarks = sum(len(u.get("bookmarks", [])) for u in users.values())
+    
+    # Sort top spiritual topics
+    topic_counts = analytics.get("top_topics", {})
+    sorted_topics = sorted(topic_counts.items(), key=lambda x: x[1], reverse=True)[:10]
+    
+    return {
+        "ok": True,
+        "summary": {
+            "today_visitors": len(today_data.get("visitors", [])),
+            "today_chats": today_data.get("chats", 0),
+            "today_pageviews": today_data.get("pageviews", 0),
+            "total_lifetime_chats": total_lifetime_chats,
+            "total_lifetime_pageviews": total_lifetime_pageviews,
+            "total_members": total_members,
+            "google_members": google_members,
+            "email_members": email_members,
+            "total_saved_threads": total_threads,
+            "total_bookmarks": total_bookmarks,
+            "telegram_clicks": total_lifetime_tg,
+            "youtube_clicks": total_lifetime_yt,
+            "total_feedbacks": len(feedbacks)
+        },
+        "chart_days": last_14_days,
+        "top_topics": [{"topic": k, "count": v} for k, v in sorted_topics],
+        "recent_activity": analytics.get("recent_events", [])[:20]
+    }

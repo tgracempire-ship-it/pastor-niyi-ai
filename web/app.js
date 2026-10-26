@@ -11,6 +11,22 @@ let busy = false;
 let activeThreadId = null;
 let activeThreadTitle = 'Current Study Session';
 
+
+// --- Client Analytics Telemetry ---
+function trackOutboundClick(linkType, url, title) {
+  try {
+    fetch('/api/analytics/event', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        type: 'click',
+        data: { link_type: linkType, url: url, sermon_title: title, summary: `${linkType}: ${title}` }
+      }),
+      keepalive: true
+    }).catch(() => {});
+  } catch (e) {}
+}
+
 // --- Active Study Session Bar & Thread UI ---
 const activeStudyBar = document.getElementById('active-study-bar');
 const activeStudyTitle = document.getElementById('active-study-title');
@@ -216,9 +232,11 @@ function addSources(bubble, sources) {
         if (isYT) {
           anchor.className = 'listen-link youtube-link';
           anchor.textContent = '▶ ' + (link.label || 'Watch on YouTube');
+          anchor.addEventListener('click', () => trackOutboundClick('youtube', url.href, source.title));
         } else {
           anchor.className = 'listen-link telegram-link';
           anchor.textContent = '🎧 ' + (link.label || 'Listen on Telegram');
+          anchor.addEventListener('click', () => trackOutboundClick('telegram', url.href, source.title));
         }
         anchor.href = url.href;
         anchor.target = '_blank';
