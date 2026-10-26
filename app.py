@@ -54,7 +54,7 @@ WEB_DIR = APP_DIR / "web"
 DB_DIR = Path(os.getenv("SERMON_DB_DIR", str(APP_DIR / "sermon_vector_db"))).resolve()
 EXCLUDE_FILE = APP_DIR / "exclude_titles.json"
 COLLECTION = "pastor_niyi_sermons"
-MODELS = list(dict.fromkeys(filter(None, [os.getenv("GEMINI_MODEL"), "gemini-3.5-flash", "gemini-3.5-flash-lite", "gemini-3-flash-preview", "gemini-3.1-flash-lite"])))
+MODELS = list(dict.fromkeys(filter(None, [os.getenv("GEMINI_MODEL"), "gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.0-flash", "gemini-1.5-flash"])))
 TOP_K = 7
 MAX_DISTANCE = 0.65
 CATALOG_FILE = APP_DIR / "sermon_catalog_with_urls.json"
@@ -209,14 +209,14 @@ Your primary responsibility is to communicate in a manner that reflects his bibl
 
 Response Guidelines:
 
-1. Start with concise answers.
-   - For straightforward questions, provide a direct answer in 1-3 paragraphs.
-   - Avoid unnecessary length unless the user requests more detail.
+1. Depth, Pastoral Substance & Thoroughness:
+   - Provide substantive, deeply edifying pastoral teaching. Avoid rushing or truncating spiritual guidance into brief bullet points.
+   - For personal life battles, addiction, spiritual warfare, faith, prayer, marriage, purpose, and doctrine, provide a rich, structured, and complete biblical counsel (typically 300-600 words) that thoroughly unfolds the truth, explains the root, and gives step-by-step practical and spiritual application.
 
-2. Be concise and responsive.
-   - Answer the question directly before adding context.
-   - For simple questions, usually stay within 80-140 words. Give more depth only when the user asks or the topic needs it.
-   - Avoid stock transitions, repeated conclusions, and restating the same idea in different words.
+2. Warm, Pastoral & Authoritative Delivery:
+   - Speak with the heart, cadence, and spiritual weight of Pastor Niyi Adetiloye.
+   - Balance spiritual depth with clarity: explain foundational spiritual mechanics (e.g. the law of the Spirit of life vs the law of sin and death; the power of the believer's profession; walking in the Spirit to overcome the flesh; divine substitution).
+   - Never sound like a brief AI summary engine or a generic bullet-point bot.
 
 3. Scripture-Centered.
    - Ground counsel and teaching in biblical principles.
@@ -273,10 +273,9 @@ Response Guidelines:
    - Occasionally end with one concise, relevant suggestion for a next step or a useful follow-up question when it naturally helps the person continue learning. Do not append a suggestion to every answer or use a canned sign-off.
 
 Default Response Style:
-- Begin with a direct answer.
-- Expand only as needed.
-- Prioritize clarity over length.
-- Sound like a wise pastor speaking to a member, not an academic writing a textbook.
+- Ground the answer in the biblical truth and the provided sermon excerpts.
+- Provide comprehensive, enriching spiritual food: explain the underlying spiritual law, the victory already provided in Christ, practical spiritual disciplines, and words of faith.
+- Sound like Pastor Niyi sitting across from a member in personal pastoral counsel: warm, spiritually commanding, deeply encouraging, and practical.
 
 The goal is not merely to provide information but to help people understand God's Word, grow spiritually, and apply biblical truth to daily life."""
 
@@ -687,7 +686,7 @@ def answer(question, hits, history, sermon_search_performed=True):
     convo = "\n".join(f"{turn.role.upper()}: {turn.content[:600]}" for turn in recent) or "(none)"
     routing_note = "" if sermon_search_performed else "\n\nRouting note: The sermon archive was not searched because this message does not appear to need Pastor Niyi's sermon teachings. Answer the user's request directly and naturally. Do not say that the sermon archive had no relevant passages, and do not invent or attribute a sermon teaching."
     prompt = f"Recent conversation:\n{convo}\n\nSermon passages from Pastor Niyi Adetiloye:\n{context}{routing_note}\n\nQuestion: {question}"
-    http_options = types.HttpOptions(timeout=12000, retry_options=types.HttpRetryOptions(attempts=1))
+    http_options = types.HttpOptions(timeout=35000, retry_options=types.HttpRetryOptions(attempts=2))
     client = genai.Client(api_key=api_key, http_options=http_options)
     config = types.GenerateContentConfig(system_instruction=SYSTEM_INSTRUCTION, temperature=0.4)
     last_error = None
@@ -726,7 +725,7 @@ def answer_stream(question, hits, history, sermon_search_performed=True):
     convo = "\n".join(f"{turn.role.upper()}: {turn.content[:600]}" for turn in recent) or "(none)"
     routing_note = "" if sermon_search_performed else "\n\nRouting note: The sermon archive was not searched because this message does not appear to need Pastor Niyi's sermon teachings. Answer the user's request directly and naturally. Do not say that the sermon archive had no relevant passages, and do not invent or attribute a sermon teaching."
     prompt = f"Recent conversation:\n{convo}\n\nSermon passages from Pastor Niyi Adetiloye:\n{context}{routing_note}\n\nQuestion: {question}"
-    http_options = types.HttpOptions(timeout=12000, retry_options=types.HttpRetryOptions(attempts=1))
+    http_options = types.HttpOptions(timeout=35000, retry_options=types.HttpRetryOptions(attempts=2))
     client = genai.Client(api_key=api_key, http_options=http_options)
     config = types.GenerateContentConfig(system_instruction=SYSTEM_INSTRUCTION, temperature=0.4)
     last_error = None
