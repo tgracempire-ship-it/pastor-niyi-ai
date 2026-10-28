@@ -1068,7 +1068,7 @@ def chat_stream(payload: ChatRequest, request: Request):
 def home_head():
     return Response(status_code=200)
 
-@app.get("/api/health")
+@app.api_route("/api/health", methods=["GET", "HEAD"])
 def health():
     return {"status": "ok", "database_ready": (DB_DIR / "chroma.sqlite3").is_file()}
 
