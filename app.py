@@ -346,21 +346,54 @@ def get_client_ip(request: Request) -> str:
         return xff.split(",")[0].strip()
     return request.client.host if request.client else "unknown"
 
+# In-memory LRU cache for privacy-safe background GeoIP lookups (used when direct connection bypasses Cloudflare)
+_geo_cache = {}
+_geo_lock = threading.Lock()
+
+def _resolve_ip_location(ip: str) -> Tuple[str, str]:
+    if not ip or ip in {"127.0.0.1", "localhost", "unknown"} or ip.startswith("10.") or ip.startswith("192.168.") or ip.startswith("172."):
+        return "Unknown", "Unknown"
+    with _geo_lock:
+        if ip in _geo_cache:
+            return _geo_cache[ip]
+    try:
+        import urllib.request
+        req = urllib.request.Request(
+            f"http://ip-api.com/json/{ip}?fields=status,countryCode,city",
+            headers={"User-Agent": "PastorNiyiAI/1.0"}
+        )
+        with urllib.request.urlopen(req, timeout=1.5) as resp:
+            data = json.loads(resp.read().decode())
+            if data.get("status") == "success":
+                res = (data.get("countryCode", "Unknown").upper(), data.get("city", "Unknown"))
+            else:
+                res = ("Unknown", "Unknown")
+    except Exception:
+        res = ("Unknown", "Unknown")
+    with _geo_lock:
+        if len(_geo_cache) > 2000:
+            _geo_cache.clear()
+        _geo_cache[ip] = res
+    return res
+
 def get_client_location(request: Request) -> Tuple[str, str]:
-    """Extract country code and city name from Cloudflare or proxy headers."""
+    """Extract country code and city name from Cloudflare/proxy headers, or fallback to cached GeoIP lookup."""
     country = request.headers.get("CF-IPCountry", "").strip().upper()
-    if not country or country == "XX":
+    if not country or country in {"XX", "T1", "UNKNOWN"}:
         country = request.headers.get("X-Country-Code", "").strip().upper()
         
     city_raw = request.headers.get("CF-IPCity", "").strip()
     if city_raw:
         try:
-            import urllib.parse
             city = urllib.parse.unquote(city_raw).strip()
         except Exception:
             city = city_raw
     else:
         city = request.headers.get("X-City", "").strip()
+        
+    if (not country or country in {"XX", "T1", "UNKNOWN"}) and (not city or city.lower() in {"unknown", "none"}):
+        client_ip = get_client_ip(request)
+        country, city = _resolve_ip_location(client_ip)
         
     return country or "Unknown", city or "Unknown" 
 
