@@ -547,13 +547,44 @@ def classify_topics(text: str) -> List[str]:
         matched.append("General Spiritual Guidance")
     return matched
 
-def record_analytics_event(event_type: str, data: Dict[str, Any], client_ip: str = ""):
-    """Safely log visitor sessions, chat questions, and media outbound clicks."""
+ISO_COUNTRY_NAMES = {
+    "NG": "Nigeria", "US": "United States", "GB": "United Kingdom", "CA": "Canada",
+    "GH": "Ghana", "ZA": "South Africa", "KE": "Kenya", "DE": "Germany",
+    "FR": "France", "AE": "United Arab Emirates", "IE": "Ireland", "AU": "Australia",
+    "IN": "India", "NL": "Netherlands", "IT": "Italy", "ES": "Spain",
+    "BR": "Brazil", "PH": "Philippines", "RW": "Rwanda", "UG": "Uganda",
+    "EG": "Egypt", "CI": "Ivory Coast", "CM": "Cameroon", "SN": "Senegal",
+    "PL": "Poland", "SE": "Sweden", "CH": "Switzerland", "BE": "Belgium",
+    "AT": "Austria", "NO": "Norway", "DK": "Denmark", "FI": "Finland",
+    "NZ": "New Zealand", "SG": "Singapore", "MY": "Malaysia", "JP": "Japan",
+    "KR": "South Korea", "CN": "China", "HK": "Hong Kong", "ZM": "Zambia",
+    "ZW": "Zimbabwe", "BW": "Botswana", "TZ": "Tanzania", "SL": "Sierra Leone",
+    "LR": "Liberia", "GM": "Gambia", "BJ": "Benin", "TG": "Togo"
+}
+
+def record_analytics_event(
+    event_type: str,
+    data: Dict[str, Any],
+    client_ip: str = "",
+    country: str = "",
+    city: str = ""
+):
+    """Safely log visitor sessions, chat questions, media outbound clicks, and privacy-preserving aggregated locations."""
     with _analytics_lock:
         analytics = _load_analytics_raw()
         now_dt = datetime.now(timezone.utc)
         today = now_dt.strftime("%Y-%m-%d")
         now_iso = now_dt.isoformat()
+        
+        # Clean country code & city
+        clean_country = (country or "").strip().upper()
+        if clean_country in {"XX", "T1", "UNKNOWN", "LOCAL", "DEV"}:
+            clean_country = ""
+        clean_city = (city or "").strip()
+        if clean_city.lower() in {"unknown", "none", "null"}:
+            clean_city = ""
+            
+        country_name = ISO_COUNTRY_NAMES.get(clean_country, clean_country) if clean_country else ""
         
         # Salted IP hash for unique daily visitor tracking without storing personal IP
         salt = today.encode()
@@ -567,11 +598,21 @@ def record_analytics_event(event_type: str, data: Dict[str, Any], client_ip: str
             "telegram_clicks": 0,
             "youtube_clicks": 0,
             "saves": 0,
-            "categories": {}
+            "categories": {},
+            "countries": {},
+            "cities": {}
         })
         
+        # Aggregate unique visitors by country & city without storing IP addresses
         if ip_hash not in daily["visitors"]:
             daily["visitors"].append(ip_hash)
+            if clean_country:
+                daily.setdefault("countries", {})[clean_country] = daily.setdefault("countries", {}).get(clean_country, 0) + 1
+                analytics.setdefault("top_countries", {})[clean_country] = analytics.setdefault("top_countries", {}).get(clean_country, 0) + 1
+            if clean_city:
+                city_key = f"{clean_city}, {country_name}" if country_name else clean_city
+                daily.setdefault("cities", {})[city_key] = daily.setdefault("cities", {}).get(city_key, 0) + 1
+                analytics.setdefault("top_cities", {})[city_key] = analytics.setdefault("top_cities", {}).get(city_key, 0) + 1
             
         if event_type == "pageview":
             daily["pageviews"] = daily.get("pageviews", 0) + 1
@@ -594,13 +635,23 @@ def record_analytics_event(event_type: str, data: Dict[str, Any], client_ip: str
         elif event_type == "save_thread":
             daily["saves"] = daily.get("saves", 0) + 1
             
+        # Non-identifying location display for recent ministerial activity feed
+        loc_display = ""
+        if clean_city and country_name:
+            loc_display = f"{clean_city}, {country_name}"
+        elif country_name:
+            loc_display = country_name
+        elif clean_country:
+            loc_display = clean_country
+            
         # Recent activity stream (keep last 50 events)
         recent = analytics.setdefault("recent_events", [])
         recent.insert(0, {
             "type": event_type,
             "time": now_iso,
             "summary": data.get("summary", ""),
-            "detail": data.get("detail", "")
+            "detail": data.get("detail", ""),
+            "location": loc_display
         })
         analytics["recent_events"] = recent[:50]
         
@@ -654,6 +705,13 @@ def get_analytics_dashboard_data() -> Dict[str, Any]:
     topic_counts = analytics.get("top_topics", {})
     sorted_topics = sorted(topic_counts.items(), key=lambda x: x[1], reverse=True)[:10]
     
+    # Sort top visitor countries & cities
+    country_counts = analytics.get("top_countries", {})
+    sorted_countries = sorted(country_counts.items(), key=lambda x: x[1], reverse=True)[:10]
+    
+    city_counts = analytics.get("top_cities", {})
+    sorted_cities = sorted(city_counts.items(), key=lambda x: x[1], reverse=True)[:10]
+    
     return {
         "ok": True,
         "summary": {
@@ -673,5 +731,7 @@ def get_analytics_dashboard_data() -> Dict[str, Any]:
         },
         "chart_days": last_14_days,
         "top_topics": [{"topic": k, "count": v} for k, v in sorted_topics],
+        "top_countries": [{"code": k, "name": ISO_COUNTRY_NAMES.get(k, k), "count": v} for k, v in sorted_countries],
+        "top_cities": [{"city": k, "count": v} for k, v in sorted_cities],
         "recent_activity": analytics.get("recent_events", [])[:20]
     }

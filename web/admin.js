@@ -39,6 +39,8 @@ const statOutboundBreakdown = document.getElementById('stat-outbound-breakdown')
 const inflowChart = document.getElementById('inflow-chart');
 const dailyTableBody = document.getElementById('daily-table-body');
 const topicsList = document.getElementById('topics-list');
+  const countriesList = document.getElementById('countries-list');
+  const citiesList = document.getElementById('cities-list');
 const activityFeed = document.getElementById('activity-feed');
 
 // Feedback elements
@@ -241,6 +243,9 @@ function renderAnalyticsData(data) {
   // 3. Render Top Spiritual Topics
   renderTopTopics(data.top_topics || []);
 
+  // 4. Render Top Visitor Locations
+  renderTopLocations(data.top_countries || [], data.top_cities || []);
+
   // 4. Render Activity Feed
   renderActivityFeed(data.recent_activity || []);
 }
@@ -313,6 +318,65 @@ function renderInflowChart(days) {
   }).join('');
 }
 
+function getCountryFlag(code) {
+  if (!code || code === 'Unknown' || code.length !== 2) return '🌐';
+  try {
+    const codePoints = code.toUpperCase().split('').map(c => 127397 + c.charCodeAt(0));
+    return String.fromCodePoint(...codePoints);
+  } catch (e) {
+    return '🌐';
+  }
+}
+
+function renderTopLocations(countries, cities) {
+  if (countriesList) {
+    if (!countries.length) {
+      countriesList.innerHTML = '<p style="color: var(--text-muted); font-size: 12px; margin: 12px 0;">Visitor country data will appear as members connect to the app.</p>';
+    } else {
+      const maxCountry = Math.max(1, ...countries.map(c => c.count));
+      countriesList.innerHTML = countries.map(c => {
+        const pct = Math.round((c.count / maxCountry) * 100);
+        const flag = getCountryFlag(c.code);
+        return `
+          <div class="topic-row">
+            <div class="topic-info">
+              <span class="location-flag">${flag}</span>
+              <span class="topic-name">${escapeHTML(c.name || c.code)}</span>
+            </div>
+            <div class="topic-bar-wrap">
+              <div class="topic-bar-fill" style="width: ${pct}%;"></div>
+            </div>
+            <span class="topic-count">${c.count}</span>
+          </div>
+        `;
+      }).join('');
+    }
+  }
+
+  if (citiesList) {
+    if (!cities.length) {
+      citiesList.innerHTML = '<p style="color: var(--text-muted); font-size: 12px; margin: 12px 0;">Visitor cities will appear as requests arrive via Cloudflare.</p>';
+    } else {
+      const maxCity = Math.max(1, ...cities.map(c => c.count));
+      citiesList.innerHTML = cities.map(c => {
+        const pct = Math.round((c.count / maxCity) * 100);
+        return `
+          <div class="topic-row">
+            <div class="topic-info">
+              <span class="location-icon" style="font-size: 13px;">📍</span>
+              <span class="topic-name">${escapeHTML(c.city)}</span>
+            </div>
+            <div class="topic-bar-wrap">
+              <div class="topic-bar-fill" style="width: ${pct}%;"></div>
+            </div>
+            <span class="topic-count">${c.count}</span>
+          </div>
+        `;
+      }).join('');
+    }
+  }
+}
+
 function renderTopTopics(topics) {
   if (!topicsList) return;
   if (!topics.length) {
@@ -354,7 +418,10 @@ function renderActivityFeed(events) {
         <span class="activity-badge ${escapeHTML(e.type)}">${typeLabel}</span>
         <div class="activity-detail">
           <div class="activity-summary">${escapeHTML(e.summary || e.detail || 'Interaction')}</div>
-          <div class="activity-time">${escapeHTML(timeAgo)}</div>
+          <div class="activity-meta-line">
+            <span class="activity-time">${escapeHTML(timeAgo)}</span>
+            ${e.location ? `<span class="activity-loc"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:middle;margin-right:2px;"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>${escapeHTML(e.location)}</span>` : ''}
+          </div>
         </div>
       </div>
     `;

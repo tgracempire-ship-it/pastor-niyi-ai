@@ -1082,3 +1082,28 @@ body {
   color: var(--emerald);
   border: 1px solid var(--emerald-border);
 }
+
+/* Location & Activity Meta Enhancements */
+.location-flag {
+  font-size: 14px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+}
+.location-icon {
+  display: inline-flex;
+  align-items: center;
+}
+.activity-meta-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.activity-loc {
+  color: var(--accent-gold);
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+}
