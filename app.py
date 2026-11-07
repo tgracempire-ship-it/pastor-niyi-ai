@@ -18,7 +18,7 @@ from pydantic import BaseModel, Field
 import csv
 import io
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Optional, Tuple
 
 import urllib.parse
 
