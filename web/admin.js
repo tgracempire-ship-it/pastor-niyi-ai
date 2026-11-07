@@ -254,7 +254,7 @@ function renderAnalyticsData(data) {
 function renderDailyTable(days) {
   if (!dailyTableBody) return;
   if (!days.length) {
-    dailyTableBody.innerHTML = '<tr><td colspan="7" style="text-align:center; color:var(--text-muted); padding:20px;">No daily history recorded yet</td></tr>';
+    dailyTableBody.innerHTML = '<tr><td colspan="8" style="text-align:center; color:var(--text-muted); padding:20px;">No daily history recorded yet</td></tr>';
     return;
   }
 
@@ -262,7 +262,7 @@ function renderDailyTable(days) {
   const reversedDays = [...days].reverse();
   const todayStr = new Date().toISOString().slice(0, 10);
 
-  dailyTableBody.innerHTML = reversedDays.map(d => {
+  dailyTableBody.innerHTML = reversedDays.map((d, idx) => {
     const isToday = d.date === todayStr;
     const visitors = d.visitors || 0;
     const pageviews = d.pageviews || 0;
@@ -273,6 +273,16 @@ function renderDailyTable(days) {
     // Questions per visitor ratio
     const ratio = visitors > 0 ? (chats / visitors).toFixed(1) : (chats > 0 ? chats : '0.0');
     const isHighEngagement = Number(ratio) >= 1.5;
+
+    // Check if day has location data
+    const countries = d.countries || {};
+    const cities = d.cities || {};
+    const countryEntries = Object.entries(countries);
+    const cityEntries = Object.entries(cities);
+    const hasLocations = countryEntries.length > 0 || cityEntries.length > 0;
+    const totalLocationsCount = countryEntries.reduce((sum, [_, c]) => sum + c, 0);
+
+    const expandRowId = `daily-loc-${idx}`;
 
     return `
       <tr class="${isToday ? 'today-row' : ''}">
@@ -286,11 +296,77 @@ function renderDailyTable(days) {
         <td class="stat-num">${tgClicks}</td>
         <td class="stat-num">${ytClicks}</td>
         <td>
-          <span class="ratio-badge ${isHighEngagement ? 'active' : ''}">${ratio} Qs / Visitor</span>
+          ${hasLocations ? `
+            <button class="loc-expand-btn" onclick="toggleDailyLocations('${expandRowId}', this)">
+              <span>📍 ${countryEntries.length} Region${countryEntries.length > 1 ? 's' : ''}</span>
+              <span style="font-size: 9px; transition: transform 0.2s;" class="arrow">▼</span>
+            </button>
+          ` : `
+            <span class="loc-expand-btn empty">—</span>
+          `}
+        </td>
+        <td>
+          <span class="ratio-badge ${isHighEngagement ? 'active' : ''}">${ratio} Qs / User</span>
         </td>
       </tr>
+      ${hasLocations ? `
+        <tr id="${expandRowId}" class="daily-loc-expand-row">
+          <td colspan="8" style="padding: 0 16px 12px 16px;">
+            <div class="daily-loc-card-body">
+              <div class="daily-loc-subgrid">
+                <div class="daily-loc-col">
+                  <h5>🌐 Countries (${countryEntries.length})</h5>
+                  <div class="daily-loc-tags">
+                    ${countryEntries.map(([code, count]) => {
+                      const flag = getCountryFlag(code);
+                      return `
+                        <span class="daily-loc-chip">
+                          <span>${flag}</span>
+                          <span>${escapeHTML(code)}</span>
+                          <span class="count-badge">${count}</span>
+                        </span>
+                      `;
+                    }).join('')}
+                  </div>
+                </div>
+                <div class="daily-loc-col">
+                  <h5>📍 Cities (${cityEntries.length})</h5>
+                  <div class="daily-loc-tags">
+                    ${cityEntries.length ? cityEntries.map(([city, count]) => `
+                      <span class="daily-loc-chip">
+                        <span>📍</span>
+                        <span>${escapeHTML(city)}</span>
+                        <span class="count-badge">${count}</span>
+                      </span>
+                    `).join('') : '<span style="color:var(--text-muted); font-size:11px;">No city level telemetry logged</span>'}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </td>
+        </tr>
+      ` : ''}
     `;
   }).join('');
+}
+
+function toggleDailyLocations(rowId, btn) {
+  const row = document.getElementById(rowId);
+  if (!row) return;
+  const isOpen = row.classList.contains('open');
+  if (isOpen) {
+    row.classList.remove('open');
+    if (btn) {
+      const arrow = btn.querySelector('.arrow');
+      if (arrow) arrow.style.transform = 'rotate(0deg)';
+    }
+  } else {
+    row.classList.add('open');
+    if (btn) {
+      const arrow = btn.querySelector('.arrow');
+      if (arrow) arrow.style.transform = 'rotate(180deg)';
+    }
+  }
 }
 
 function renderInflowChart(days) {

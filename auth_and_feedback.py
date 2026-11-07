@@ -685,7 +685,9 @@ def get_analytics_dashboard_data() -> Dict[str, Any]:
             "pageviews": d_data.get("pageviews", 0),
             "chats": d_data.get("chats", 0),
             "telegram_clicks": d_data.get("telegram_clicks", 0),
-            "youtube_clicks": d_data.get("youtube_clicks", 0)
+            "youtube_clicks": d_data.get("youtube_clicks", 0),
+            "countries": d_data.get("countries", {}),
+            "cities": d_data.get("cities", {})
         })
         
     today_data = daily.get(today, {})
