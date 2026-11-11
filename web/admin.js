@@ -264,7 +264,7 @@ function initExportDatePickers() {
   }
 }
 
-function downloadAnalyticsCSV() {
+async function downloadAnalyticsCSV() {
   const token = getAdminToken();
   if (!token) return showLogin();
   const startInput = document.getElementById('export-start-date');
@@ -276,7 +276,45 @@ function downloadAnalyticsCSV() {
   if (startDate) url += `&start_date=${encodeURIComponent(startDate)}`;
   if (endDate) url += `&end_date=${encodeURIComponent(endDate)}`;
 
-  window.location.href = url;
+  const btn = document.querySelector('.export-csv-btn');
+  const origContent = btn ? btn.innerHTML : '';
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<span>Exporting...</span>';
+  }
+
+  try {
+    const res = await fetch(url, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    if (!res.ok) {
+      const errText = await res.text();
+      alert(`Export failed (${res.status}): ${errText || 'Unauthorized session'}`);
+      if (res.status === 401) {
+        clearAdminToken();
+        showLogin();
+      }
+      return;
+    }
+    const blob = await res.blob();
+    const downloadUrl = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = downloadUrl;
+    const filename = `pastor_niyi_ai_analytics_${startDate || 'all'}_to_${endDate || 'today'}.csv`;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(downloadUrl);
+  } catch (err) {
+    console.error('Download error:', err);
+    alert('Failed to download report: ' + err.message);
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = origContent;
+    }
+  }
 }
 
 
