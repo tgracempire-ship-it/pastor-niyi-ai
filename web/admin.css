@@ -1189,3 +1189,25 @@ body {
   padding: 1px 5px;
   border-radius: 4px;
 }
+
+.export-csv-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: rgba(255, 198, 55, 0.12);
+  border: 1px solid rgba(255, 198, 55, 0.35);
+  color: #ffd750;
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.export-csv-btn:hover {
+  background: rgba(255, 198, 55, 0.22);
+  border-color: #ffd750;
+  color: #fff;
+  transform: translateY(-1px);
+}

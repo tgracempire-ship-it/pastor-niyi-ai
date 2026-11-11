@@ -614,6 +614,7 @@ def record_analytics_event(
                 daily.setdefault("cities", {})[city_key] = daily.setdefault("cities", {}).get(city_key, 0) + 1
                 analytics.setdefault("top_cities", {})[city_key] = analytics.setdefault("top_cities", {}).get(city_key, 0) + 1
             
+        topic_label = "General Spiritual Guidance"
         if event_type == "pageview":
             daily["pageviews"] = daily.get("pageviews", 0) + 1
         elif event_type == "chat":
@@ -621,6 +622,8 @@ def record_analytics_event(
             query = data.get("query", "").strip()
             if query:
                 topics = classify_topics(query)
+                if topics:
+                    topic_label = topics[0]
                 for cat in topics:
                     daily.setdefault("categories", {})[cat] = daily["categories"].get(cat, 0) + 1
                     analytics.setdefault("top_topics", {})[cat] = analytics["top_topics"].get(cat, 0) + 1
@@ -644,13 +647,26 @@ def record_analytics_event(
         elif clean_country:
             loc_display = clean_country
             
+        # Privacy-Safe Event Summary: Never store raw user query or message text
+        if event_type == "chat":
+            event_summary = f"Study Topic: {topic_label}"
+        elif event_type == "save_thread":
+            event_summary = "Study session saved to user library"
+        elif event_type == "click":
+            lt = data.get("link_type", "sermon")
+            event_summary = f"Accessed {lt} sermon link"
+        elif event_type == "pageview":
+            event_summary = "Landing page visit"
+        else:
+            event_summary = "Ministry interaction"
+            
         # Recent activity stream (keep last 50 events)
         recent = analytics.setdefault("recent_events", [])
         recent.insert(0, {
             "type": event_type,
             "time": now_iso,
-            "summary": data.get("summary", ""),
-            "detail": data.get("detail", ""),
+            "summary": event_summary,
+            "detail": "",
             "location": loc_display
         })
         analytics["recent_events"] = recent[:50]
@@ -737,3 +753,140 @@ def get_analytics_dashboard_data() -> Dict[str, Any]:
         "top_cities": [{"city": k, "count": v} for k, v in sorted_cities],
         "recent_activity": analytics.get("recent_events", [])[:20]
     }
+
+
+def generate_analytics_csv_report() -> str:
+    """Generate a clean, executive-ready CSV report of all analytics from inception to date."""
+    import io
+    import csv
+
+    analytics = _load_analytics_raw()
+    daily = analytics.get("daily", {})
+    dates = sorted(daily.keys())
+    if not dates:
+        return "No analytics data recorded yet."
+
+    total_visitors = sum(len(d.get("visitors", [])) if isinstance(d.get("visitors"), list) else d.get("visitors", 0) for d in daily.values())
+    total_pageviews = sum(d.get("pageviews", 0) for d in daily.values())
+    total_chats = sum(d.get("chats", 0) for d in daily.values())
+    total_tg = sum(d.get("telegram_clicks", 0) for d in daily.values())
+    total_yt = sum(d.get("youtube_clicks", 0) for d in daily.values())
+    total_saves = sum(d.get("saves", 0) for d in daily.values())
+
+    oct_dates = [d for d in dates if d.startswith("2026-10")]
+    nov_dates = [d for d in dates if d.startswith("2026-11")]
+
+    def calc_month(m_dates):
+        v = sum(len(daily[d].get("visitors", [])) if isinstance(daily[d].get("visitors"), list) else daily[d].get("visitors", 0) for d in m_dates)
+        pv = sum(daily[d].get("pageviews", 0) for d in m_dates)
+        c = sum(daily[d].get("chats", 0) for d in m_dates)
+        tg = sum(daily[d].get("telegram_clicks", 0) for d in m_dates)
+        yt = sum(daily[d].get("youtube_clicks", 0) for d in m_dates)
+        ratio = f"{(c / v):.2f}" if v > 0 else "0.00"
+        return len(m_dates), v, pv, c, tg, yt, ratio
+
+    oct_days, oct_v, oct_pv, oct_c, oct_tg, oct_yt, oct_ratio = calc_month(oct_dates)
+    nov_days, nov_v, nov_pv, nov_c, nov_tg, nov_yt, nov_ratio = calc_month(nov_dates)
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+
+    writer.writerow(["PASTOR NIYI AI - MINISTRY AUDIENCE & INTERACTION REPORT"])
+    writer.writerow(["Reporting Period", f"{dates[0]} to {dates[-1]} (Inception to Date)"])
+    writer.writerow(["Generated On", datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")])
+    writer.writerow(["Confidentiality Standard", "Strict Pastoral Care Privacy - Zero Member PII / Salted Hashes"])
+    writer.writerow([])
+
+    writer.writerow(["=== EXECUTIVE KPI OVERVIEW ==="])
+    writer.writerow(["Metric", "Total Count", "Daily Average", "Notes"])
+    writer.writerow(["Total Inflow Visitors", total_visitors, f"{total_visitors / len(dates):.1f} / day", "Unique daily visitor sessions"])
+    writer.writerow(["Total Pageviews", total_pageviews, f"{total_pageviews / len(dates):.1f} / day", "Portal & study app impressions"])
+    writer.writerow(["Study Questions Asked", total_chats, f"{total_chats / len(dates):.1f} / day", "Spiritual counseling & Bible inquiries"])
+    writer.writerow(["Overall Engagement Ratio", f"{(total_chats / total_visitors):.2f} Qs / Visitor" if total_visitors else "0.00", "-", "Questions asked per unique visitor"])
+    writer.writerow(["Telegram Sermon Clicks", total_tg, f"{total_tg / len(dates):.1f} / day", "Outflow to TDCI Telegram audio/channel"])
+    writer.writerow(["YouTube Sermon Clicks", total_yt, f"{total_yt / len(dates):.1f} / day", "Outflow to TDCI YouTube video archive"])
+    writer.writerow(["Saved Study Threads", total_saves, f"{total_saves / len(dates):.1f} / day", "Members saving answers to study library"])
+    writer.writerow([])
+
+    writer.writerow(["=== MONTHLY PERFORMANCE COMPARISON ==="])
+    writer.writerow(["Month", "Active Days", "Visitors", "Pageviews", "Questions Asked", "Telegram Clicks", "YouTube Clicks", "Engagement Ratio"])
+    if oct_days > 0:
+        writer.writerow(["October 2026", oct_days, oct_v, oct_pv, oct_c, oct_tg, oct_yt, f"{oct_ratio} Qs/User"])
+    if nov_days > 0:
+        writer.writerow(["November 2026 (Month to Date)", nov_days, nov_v, nov_pv, nov_c, nov_tg, nov_yt, f"{nov_ratio} Qs/User"])
+    writer.writerow([])
+
+    writer.writerow(["=== DAY-BY-DAY TRAFFIC & ENGAGEMENT AUDIT ==="])
+    writer.writerow([
+        "Date",
+        "Day of Week",
+        "Visitors",
+        "Pageviews",
+        "Questions Asked",
+        "Engagement Ratio (Qs/Visitor)",
+        "Telegram Outflow",
+        "YouTube Outflow",
+        "Saved Studies",
+        "Top Spiritual Topics of the Day",
+        "Locations (Countries & Cities Active)"
+    ])
+
+    for d in reversed(dates):
+        entry = daily[d]
+        dt = datetime.strptime(d, "%Y-%m-%d")
+        day_name = dt.strftime("%A")
+        v = len(entry.get("visitors", [])) if isinstance(entry.get("visitors"), list) else entry.get("visitors", 0)
+        pv = entry.get("pageviews", 0)
+        c = entry.get("chats", 0)
+        tg = entry.get("telegram_clicks", 0)
+        yt = entry.get("youtube_clicks", 0)
+        saves = entry.get("saves", 0)
+        ratio = f"{(c / v):.2f}" if v > 0 else "0.00"
+
+        cats = entry.get("categories", {})
+        cat_str = "; ".join([f"{k} ({val})" for k, val in sorted(cats.items(), key=lambda x: -x[1])]) if cats else "General Inquiries"
+
+        countries = entry.get("countries", {})
+        cities = entry.get("cities", {})
+        loc_parts = []
+        if countries:
+            loc_parts.append("Countries: " + ", ".join([f"{k} ({val})" for k, val in countries.items()]))
+        if cities:
+            loc_parts.append("Cities: " + ", ".join([f"{k} ({val})" for k, val in cities.items()]))
+        loc_str = " | ".join(loc_parts) if loc_parts else "Telemetry unlogged (prior to upgrade)"
+
+        writer.writerow([
+            d,
+            day_name,
+            v,
+            pv,
+            c,
+            ratio,
+            tg,
+            yt,
+            saves,
+            cat_str,
+            loc_str
+        ])
+    writer.writerow([])
+
+    writer.writerow(["=== TOP SPIRITUAL THEMES EXPLORED ==="])
+    writer.writerow(["Rank", "Spiritual Theme", "Inquiries Count", "Share of Pastoral Inquiries (%)"])
+    topics = analytics.get("top_topics", {})
+    sorted_topics = sorted(topics.items(), key=lambda x: -x[1])
+    total_topic_inquiries = sum(topics.values())
+    for rank, (topic, count) in enumerate(sorted_topics, 1):
+        share = f"{(count / total_topic_inquiries * 100):.1f}%" if total_topic_inquiries > 0 else "0.0%"
+        writer.writerow([rank, topic, count, share])
+    writer.writerow([])
+
+    writer.writerow(["=== AUDIENCE GEOGRAPHIC DISTRIBUTION (TELEMETRY CAPTURED) ==="])
+    writer.writerow(["Country Code", "Total Sessions / Visits Recorded", "Top Associated Metropolitan Areas"])
+    countries = analytics.get("top_countries", {})
+    cities = analytics.get("top_cities", {})
+    for code, count in sorted(countries.items(), key=lambda x: -x[1]):
+        related_cities = [f"{c} ({v})" for c, v in cities.items() if (code == 'NG' and 'Nigeria' in c) or (code == 'US' and 'United States' in c) or (code == 'CA' and 'Canada' in c) or (code == 'BR' and 'Brazil' in c) or (code == 'GB' and 'United Kingdom' in c) or (code == 'IE' and 'Ireland' in c) or (code == 'DE' and 'Germany' in c) or (code == 'SG' and 'Singapore' in c)]
+        writer.writerow([code, count, "; ".join(related_cities) if related_cities else "Nationwide / Unspecified"])
+
+    return output.getvalue()
+

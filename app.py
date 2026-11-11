@@ -47,6 +47,7 @@ from auth_and_feedback import (
     remove_user_thread,
     record_analytics_event,
     get_analytics_dashboard_data,
+    generate_analytics_csv_report,
 )
 
 APP_DIR = Path(__file__).resolve().parent
@@ -1030,6 +1031,17 @@ def admin_analytics(request: Request):
     require_admin(request)
     return get_analytics_dashboard_data()
 
+@app.get("/api/admin/analytics/export-csv")
+def export_analytics_csv(request: Request):
+    require_admin(request)
+    csv_content = generate_analytics_csv_report()
+    filename = f"pastor_niyi_ai_analytics_{datetime.now().strftime('%Y%m%d')}.csv"
+    return Response(
+        content=csv_content,
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
 @app.post("/api/analytics/event")
 def track_event(payload: AnalyticsEventRequest, request: Request):
     client_ip = get_client_ip(request)
@@ -1073,7 +1085,7 @@ def chat_stream(payload: ChatRequest, request: Request):
             yield sse_event("done", {})
             return
         country, city = get_client_location(request)
-        record_analytics_event("chat", {"query": payload.message.strip(), "summary": payload.message.strip()[:80]}, get_client_ip(request), country, city)
+        record_analytics_event("chat", {"query": payload.message.strip()}, get_client_ip(request), country, city)
         search_sermons, route_reason = should_search_sermons(payload.message, history)
         hits = []
         try:
@@ -1137,7 +1149,7 @@ def chat(payload: ChatRequest, request: Request):
         return {"answer": quick_reply, "sources": []}
     try:
         country, city = get_client_location(request)
-        record_analytics_event("chat", {"query": payload.message.strip(), "summary": payload.message.strip()[:80]}, get_client_ip(request), country, city)
+        record_analytics_event("chat", {"query": payload.message.strip()}, get_client_ip(request), country, city)
         search_sermons, route_reason = should_search_sermons(payload.message, history)
         hits = []
         if search_sermons:
