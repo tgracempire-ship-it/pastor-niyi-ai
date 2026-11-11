@@ -1032,10 +1032,16 @@ def admin_analytics(request: Request):
     return get_analytics_dashboard_data()
 
 @app.get("/api/admin/analytics/export-csv")
-def export_analytics_csv(request: Request):
-    require_admin(request)
-    csv_content = generate_analytics_csv_report()
-    filename = f"pastor_niyi_ai_analytics_{datetime.now().strftime('%Y%m%d')}.csv"
+def export_analytics_csv(
+    request: Request,
+    token: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None
+):
+    require_admin(request, token)
+    csv_content = generate_analytics_csv_report(start_date=start_date, end_date=end_date)
+    suffix = f"{start_date or 'all'}_to_{end_date or 'today'}"
+    filename = f"pastor_niyi_ai_analytics_{suffix}.csv"
     return Response(
         content=csv_content,
         media_type="text/csv",

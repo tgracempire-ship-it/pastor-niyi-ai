@@ -1190,6 +1190,39 @@ body {
   border-radius: 4px;
 }
 
+.export-controls-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.export-date-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-size: 11px;
+}
+.export-date-group label {
+  text-transform: uppercase;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: #ffd750;
+  font-size: 10px;
+}
+.export-date-input {
+  background: transparent;
+  border: none;
+  color: var(--text-main);
+  font-family: inherit;
+  font-size: 11px;
+  outline: none;
+  cursor: pointer;
+  color-scheme: dark;
+}
 .export-csv-btn {
   display: inline-flex;
   align-items: center;

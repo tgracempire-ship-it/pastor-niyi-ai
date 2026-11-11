@@ -248,6 +248,35 @@ function renderAnalyticsData(data) {
 
   // 4. Render Activity Feed
   renderActivityFeed(data.recent_activity || []);
+
+  // 5. Initialize CSV Export Date Range Pickers
+  initExportDatePickers();
+}
+
+function initExportDatePickers() {
+  const startInput = document.getElementById('export-start-date');
+  const endInput = document.getElementById('export-end-date');
+  if (startInput && !startInput.value) {
+    startInput.value = '2026-10-01';
+  }
+  if (endInput && !endInput.value) {
+    endInput.value = new Date().toISOString().slice(0, 10);
+  }
+}
+
+function downloadAnalyticsCSV() {
+  const token = getAdminToken();
+  if (!token) return showLogin();
+  const startInput = document.getElementById('export-start-date');
+  const endInput = document.getElementById('export-end-date');
+  const startDate = startInput ? startInput.value.trim() : '';
+  const endDate = endInput ? endInput.value.trim() : '';
+
+  let url = `/api/admin/analytics/export-csv?token=${encodeURIComponent(token)}`;
+  if (startDate) url += `&start_date=${encodeURIComponent(startDate)}`;
+  if (endDate) url += `&end_date=${encodeURIComponent(endDate)}`;
+
+  window.location.href = url;
 }
 
 

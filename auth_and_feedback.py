@@ -755,23 +755,44 @@ def get_analytics_dashboard_data() -> Dict[str, Any]:
     }
 
 
-def generate_analytics_csv_report() -> str:
-    """Generate a clean, executive-ready CSV report of all analytics from inception to date."""
+def generate_analytics_csv_report(start_date: Optional[str] = None, end_date: Optional[str] = None) -> str:
+    """Generate a clean, executive-ready CSV report of analytics filtered by date range."""
     import io
     import csv
 
     analytics = _load_analytics_raw()
     daily = analytics.get("daily", {})
-    dates = sorted(daily.keys())
-    if not dates:
+    all_dates = sorted(daily.keys())
+    if not all_dates:
         return "No analytics data recorded yet."
 
-    total_visitors = sum(len(d.get("visitors", [])) if isinstance(d.get("visitors"), list) else d.get("visitors", 0) for d in daily.values())
-    total_pageviews = sum(d.get("pageviews", 0) for d in daily.values())
-    total_chats = sum(d.get("chats", 0) for d in daily.values())
-    total_tg = sum(d.get("telegram_clicks", 0) for d in daily.values())
-    total_yt = sum(d.get("youtube_clicks", 0) for d in daily.values())
-    total_saves = sum(d.get("saves", 0) for d in daily.values())
+    # Filter dates by range if provided
+    dates = all_dates
+    if start_date:
+        dates = [d for d in dates if d >= start_date]
+    if end_date:
+        dates = [d for d in dates if d <= end_date]
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+
+    period_label = f"{dates[0]} to {dates[-1]}" if dates else f"{start_date or 'Inception'} to {end_date or 'Present'}"
+    writer.writerow(["PASTOR NIYI AI - MINISTRY AUDIENCE & INTERACTION REPORT"])
+    writer.writerow(["Reporting Period", period_label])
+    writer.writerow(["Generated On", datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")])
+    writer.writerow(["Confidentiality Standard", "Strict Pastoral Care Privacy - Zero Member PII / Salted Hashes"])
+    writer.writerow([])
+
+    if not dates:
+        writer.writerow(["Notice", "No analytics records found within the selected date filter range."])
+        return output.getvalue()
+
+    total_visitors = sum(len(daily[d].get("visitors", [])) if isinstance(daily[d].get("visitors"), list) else daily[d].get("visitors", 0) for d in dates)
+    total_pageviews = sum(daily[d].get("pageviews", 0) for d in dates)
+    total_chats = sum(daily[d].get("chats", 0) for d in dates)
+    total_tg = sum(daily[d].get("telegram_clicks", 0) for d in dates)
+    total_yt = sum(daily[d].get("youtube_clicks", 0) for d in dates)
+    total_saves = sum(daily[d].get("saves", 0) for d in dates)
 
     oct_dates = [d for d in dates if d.startswith("2026-10")]
     nov_dates = [d for d in dates if d.startswith("2026-11")]
@@ -788,15 +809,6 @@ def generate_analytics_csv_report() -> str:
     oct_days, oct_v, oct_pv, oct_c, oct_tg, oct_yt, oct_ratio = calc_month(oct_dates)
     nov_days, nov_v, nov_pv, nov_c, nov_tg, nov_yt, nov_ratio = calc_month(nov_dates)
 
-    output = io.StringIO()
-    writer = csv.writer(output)
-
-    writer.writerow(["PASTOR NIYI AI - MINISTRY AUDIENCE & INTERACTION REPORT"])
-    writer.writerow(["Reporting Period", f"{dates[0]} to {dates[-1]} (Inception to Date)"])
-    writer.writerow(["Generated On", datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")])
-    writer.writerow(["Confidentiality Standard", "Strict Pastoral Care Privacy - Zero Member PII / Salted Hashes"])
-    writer.writerow([])
-
     writer.writerow(["=== EXECUTIVE KPI OVERVIEW ==="])
     writer.writerow(["Metric", "Total Count", "Daily Average", "Notes"])
     writer.writerow(["Total Inflow Visitors", total_visitors, f"{total_visitors / len(dates):.1f} / day", "Unique daily visitor sessions"])
@@ -808,13 +820,14 @@ def generate_analytics_csv_report() -> str:
     writer.writerow(["Saved Study Threads", total_saves, f"{total_saves / len(dates):.1f} / day", "Members saving answers to study library"])
     writer.writerow([])
 
-    writer.writerow(["=== MONTHLY PERFORMANCE COMPARISON ==="])
-    writer.writerow(["Month", "Active Days", "Visitors", "Pageviews", "Questions Asked", "Telegram Clicks", "YouTube Clicks", "Engagement Ratio"])
-    if oct_days > 0:
-        writer.writerow(["October 2026", oct_days, oct_v, oct_pv, oct_c, oct_tg, oct_yt, f"{oct_ratio} Qs/User"])
-    if nov_days > 0:
-        writer.writerow(["November 2026 (Month to Date)", nov_days, nov_v, nov_pv, nov_c, nov_tg, nov_yt, f"{nov_ratio} Qs/User"])
-    writer.writerow([])
+    if oct_days > 0 or nov_days > 0:
+        writer.writerow(["=== MONTHLY PERFORMANCE BREAKDOWN ==="])
+        writer.writerow(["Month", "Active Days", "Visitors", "Pageviews", "Questions Asked", "Telegram Clicks", "YouTube Clicks", "Engagement Ratio"])
+        if oct_days > 0:
+            writer.writerow(["October 2026", oct_days, oct_v, oct_pv, oct_c, oct_tg, oct_yt, f"{oct_ratio} Qs/User"])
+        if nov_days > 0:
+            writer.writerow(["November 2026 (Month to Date)", nov_days, nov_v, nov_pv, nov_c, nov_tg, nov_yt, f"{nov_ratio} Qs/User"])
+        writer.writerow([])
 
     writer.writerow(["=== DAY-BY-DAY TRAFFIC & ENGAGEMENT AUDIT ==="])
     writer.writerow([
@@ -870,22 +883,32 @@ def generate_analytics_csv_report() -> str:
         ])
     writer.writerow([])
 
-    writer.writerow(["=== TOP SPIRITUAL THEMES EXPLORED ==="])
-    writer.writerow(["Rank", "Spiritual Theme", "Inquiries Count", "Share of Pastoral Inquiries (%)"])
-    topics = analytics.get("top_topics", {})
-    sorted_topics = sorted(topics.items(), key=lambda x: -x[1])
-    total_topic_inquiries = sum(topics.values())
+    # Aggregate topics and locations for the selected range
+    range_topics = {}
+    range_countries = {}
+    range_cities = {}
+    for d in dates:
+        e = daily[d]
+        for cat, cnt in e.get("categories", {}).items():
+            range_topics[cat] = range_topics.get(cat, 0) + cnt
+        for c, cnt in e.get("countries", {}).items():
+            range_countries[c] = range_countries.get(c, 0) + cnt
+        for city, cnt in e.get("cities", {}).items():
+            range_cities[city] = range_cities.get(city, 0) + cnt
+
+    writer.writerow(["=== TOP SPIRITUAL THEMES IN SELECTED PERIOD ==="])
+    writer.writerow(["Rank", "Spiritual Theme", "Inquiries Count", "Share of Period Inquiries (%)"])
+    sorted_topics = sorted(range_topics.items(), key=lambda x: -x[1])
+    total_topic_inquiries = sum(range_topics.values())
     for rank, (topic, count) in enumerate(sorted_topics, 1):
         share = f"{(count / total_topic_inquiries * 100):.1f}%" if total_topic_inquiries > 0 else "0.0%"
         writer.writerow([rank, topic, count, share])
     writer.writerow([])
 
-    writer.writerow(["=== AUDIENCE GEOGRAPHIC DISTRIBUTION (TELEMETRY CAPTURED) ==="])
-    writer.writerow(["Country Code", "Total Sessions / Visits Recorded", "Top Associated Metropolitan Areas"])
-    countries = analytics.get("top_countries", {})
-    cities = analytics.get("top_cities", {})
-    for code, count in sorted(countries.items(), key=lambda x: -x[1]):
-        related_cities = [f"{c} ({v})" for c, v in cities.items() if (code == 'NG' and 'Nigeria' in c) or (code == 'US' and 'United States' in c) or (code == 'CA' and 'Canada' in c) or (code == 'BR' and 'Brazil' in c) or (code == 'GB' and 'United Kingdom' in c) or (code == 'IE' and 'Ireland' in c) or (code == 'DE' and 'Germany' in c) or (code == 'SG' and 'Singapore' in c)]
+    writer.writerow(["=== AUDIENCE GEOGRAPHIC DISTRIBUTION IN SELECTED PERIOD ==="])
+    writer.writerow(["Country Code", "Sessions Recorded", "Associated Metropolitan Areas"])
+    for code, count in sorted(range_countries.items(), key=lambda x: -x[1]):
+        related_cities = [f"{c} ({v})" for c, v in range_cities.items() if (code == 'NG' and 'Nigeria' in c) or (code == 'US' and 'United States' in c) or (code == 'CA' and 'Canada' in c) or (code == 'BR' and 'Brazil' in c) or (code == 'GB' and 'United Kingdom' in c) or (code == 'IE' and 'Ireland' in c) or (code == 'DE' and 'Germany' in c) or (code == 'SG' and 'Singapore' in c)]
         writer.writerow([code, count, "; ".join(related_cities) if related_cities else "Nationwide / Unspecified"])
 
     return output.getvalue()
