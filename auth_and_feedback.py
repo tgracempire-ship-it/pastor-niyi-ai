@@ -603,16 +603,32 @@ def record_analytics_event(
             "cities": {}
         })
         
-        # Aggregate unique visitors by country & city without storing IP addresses
+        # Record unique daily visitor hash
         if ip_hash not in daily["visitors"]:
             daily["visitors"].append(ip_hash)
-            if clean_country:
-                daily.setdefault("countries", {})[clean_country] = daily.setdefault("countries", {}).get(clean_country, 0) + 1
-                analytics.setdefault("top_countries", {})[clean_country] = analytics.setdefault("top_countries", {}).get(clean_country, 0) + 1
-            if clean_city:
-                city_key = f"{clean_city}, {country_name}" if country_name else clean_city
-                daily.setdefault("cities", {})[city_key] = daily.setdefault("cities", {}).get(city_key, 0) + 1
-                analytics.setdefault("top_cities", {})[city_key] = analytics.setdefault("top_cities", {}).get(city_key, 0) + 1
+
+        # Cloud bot / datacenter filtering list
+        CLOUD_BOT_CITIES = {
+            "ashburn", "quincy", "mountain view", "cupertino", "falkenstein", 
+            "são paulo", "sao paulo", "singapore", "atlanta", "washington", "council bluffs"
+        }
+
+        # ONLY record locations for real human interactions (chat, click, save_thread)
+        # Automated web crawlers and datacenters (AWS, Azure, etc.) are strictly excluded!
+        is_real_member_event = event_type in {"chat", "click", "save_thread"}
+        is_bot_city = bool(clean_city and any(b in clean_city.lower() for b in CLOUD_BOT_CITIES))
+
+        if is_real_member_event and not is_bot_city:
+            member_hashes = daily.setdefault("member_hashes", [])
+            if ip_hash not in member_hashes:
+                member_hashes.append(ip_hash)
+                if clean_country:
+                    daily.setdefault("countries", {})[clean_country] = daily.setdefault("countries", {}).get(clean_country, 0) + 1
+                    analytics.setdefault("top_countries", {})[clean_country] = analytics.setdefault("top_countries", {}).get(clean_country, 0) + 1
+                if clean_city:
+                    city_key = f"{clean_city}, {country_name}" if country_name else clean_city
+                    daily.setdefault("cities", {})[city_key] = daily.setdefault("cities", {}).get(city_key, 0) + 1
+                    analytics.setdefault("top_cities", {})[city_key] = analytics.setdefault("top_cities", {}).get(city_key, 0) + 1
             
         topic_label = "General Spiritual Guidance"
         if event_type == "pageview":
@@ -638,14 +654,15 @@ def record_analytics_event(
         elif event_type == "save_thread":
             daily["saves"] = daily.get("saves", 0) + 1
             
-        # Non-identifying location display for recent ministerial activity feed
+        # Non-identifying location display for recent ministerial activity feed (real members only)
         loc_display = ""
-        if clean_city and country_name:
-            loc_display = f"{clean_city}, {country_name}"
-        elif country_name:
-            loc_display = country_name
-        elif clean_country:
-            loc_display = clean_country
+        if is_real_member_event and not is_bot_city:
+            if clean_city and country_name:
+                loc_display = f"{clean_city}, {country_name}"
+            elif country_name:
+                loc_display = country_name
+            elif clean_country:
+                loc_display = clean_country
             
         # Privacy-Safe Event Summary: Never store raw user query or message text
         if event_type == "chat":
