@@ -495,6 +495,19 @@ def set_google_client_id(client_id: str) -> bool:
     ADMIN_AUTH_FILE.write_text(json.dumps(auth, indent=2), encoding="utf-8")
     return True
 
+def get_ga_measurement_id() -> str:
+    env_id = os.getenv("GA_MEASUREMENT_ID", "").strip()
+    if env_id:
+        return env_id
+    auth = _load_admin_auth()
+    return auth.get("ga_measurement_id", "").strip()
+
+def set_ga_measurement_id(measurement_id: str) -> bool:
+    auth = _load_admin_auth()
+    auth["ga_measurement_id"] = str(measurement_id or "").strip()
+    ADMIN_AUTH_FILE.write_text(json.dumps(auth, indent=2), encoding="utf-8")
+    return True
+
 
 # ── Live Analytics & Traffic Inflow/Outflow Engine ──────────────────────────
 

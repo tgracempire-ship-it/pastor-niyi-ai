@@ -37,6 +37,8 @@ from auth_and_feedback import (
     authenticate_member_email,
     get_google_client_id,
     set_google_client_id,
+    get_ga_measurement_id,
+    set_ga_measurement_id,
     validate_user_session,
     get_user_profile,
     add_user_bookmark,
@@ -318,6 +320,9 @@ class MemberLoginRequest(BaseModel):
 
 class GoogleConfigUpdateRequest(BaseModel):
     client_id: str
+
+class GAConfigUpdateRequest(BaseModel):
+    measurement_id: str
 
 class UserBookmarkRequest(BaseModel):
     title: str = Field(min_length=1, max_length=300)
@@ -948,7 +953,10 @@ def submit_feedback(payload: FeedbackSubmitRequest, request: Request):
 
 @app.get("/api/auth/config")
 def get_auth_config():
-    return {"google_client_id": get_google_client_id()}
+    return {
+        "google_client_id": get_google_client_id(),
+        "ga_measurement_id": get_ga_measurement_id()
+    }
 
 @app.post("/api/auth/member")
 def member_login(payload: MemberLoginRequest):
@@ -966,6 +974,16 @@ def admin_set_google_id(payload: GoogleConfigUpdateRequest, request: Request):
     require_admin(request)
     set_google_client_id(payload.client_id)
     return {"ok": True, "message": "Google Client ID updated successfully."}
+
+@app.post("/api/admin/ga-measurement-id")
+def admin_set_ga_id(payload: GAConfigUpdateRequest, request: Request):
+    require_admin(request)
+    set_ga_measurement_id(payload.measurement_id)
+    return {
+        "ok": True,
+        "message": "Google Analytics Measurement ID updated successfully.",
+        "ga_measurement_id": get_ga_measurement_id()
+    }
 
 @app.post("/api/auth/google")
 def auth_google(payload: GoogleAuthRequest):

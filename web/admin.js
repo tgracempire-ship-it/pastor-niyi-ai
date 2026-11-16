@@ -860,6 +860,67 @@ async function handleSaveGoogleClientId() {
   }
 }
 
+// --- Google Analytics 4 (GA4) Modal ---
+const gaModal = document.getElementById('ga-modal');
+const gaMeasurementIdInput = document.getElementById('ga-measurement-id-input');
+const gaConfigMsg = document.getElementById('ga-config-msg');
+const saveGaBtn = document.getElementById('save-ga-btn');
+
+async function openGAModal() {
+  if (!gaModal) return;
+  gaModal.hidden = false;
+  if (gaConfigMsg) gaConfigMsg.hidden = true;
+  try {
+    const res = await fetch('/api/auth/config');
+    const data = await res.json();
+    if (gaMeasurementIdInput && data.ga_measurement_id) {
+      gaMeasurementIdInput.value = data.ga_measurement_id;
+    }
+  } catch (e) {}
+}
+
+function closeGAModal() {
+  if (gaModal) gaModal.hidden = true;
+}
+
+gaModal?.addEventListener('click', (e) => {
+  if (e.target === gaModal) closeGAModal();
+});
+
+async function handleSaveGAMeasurementId() {
+  const token = getAdminToken();
+  if (!token) return showLogin();
+
+  const measurementId = gaMeasurementIdInput?.value?.trim() || '';
+  setLoading(saveGaBtn, true, 'Saving...');
+
+  try {
+    const res = await fetch('/api/admin/ga-measurement-id', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ measurement_id: measurementId })
+    });
+
+    const data = await res.json();
+    if (!res.ok || !data.ok) throw new Error(data.detail || 'Could not save Measurement ID');
+
+    if (gaConfigMsg) {
+      gaConfigMsg.textContent = measurementId
+        ? `Google Analytics active with ID: ${measurementId}`
+        : 'Google Analytics Measurement ID cleared.';
+      gaConfigMsg.hidden = false;
+    }
+    setTimeout(() => closeGAModal(), 1400);
+  } catch (err) {
+    alert('Error saving Measurement ID: ' + err.message);
+  } finally {
+    setLoading(saveGaBtn, false, 'Save Measurement ID');
+  }
+}
+
 // Helper: Toggle Password Visibility
 function togglePasswordVisibility(inputId, btn) {
   const el = document.getElementById(inputId);

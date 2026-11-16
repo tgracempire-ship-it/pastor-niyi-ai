@@ -12,9 +12,40 @@ let activeThreadId = null;
 let activeThreadTitle = 'Current Study Session';
 
 
+// --- Google Analytics 4 (GA4) Global Helper ---
+window.trackGAEvent = function(eventName, eventParams = {}) {
+  try {
+    if (typeof window.gtag === 'function') {
+      window.gtag('event', eventName, eventParams);
+    }
+  } catch (e) {}
+};
+
+function initGoogleAnalytics(measurementId) {
+  if (!measurementId || window._gaInitialized) return;
+  window._gaInitialized = true;
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  window.gtag = gtag;
+  gtag('js', new Date());
+  gtag('config', measurementId, {
+    send_page_view: true,
+    anonymize_ip: true
+  });
+
+  const script = document.createElement('script');
+  script.async = true;
+  script.src = `https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(measurementId)}`;
+  document.head.appendChild(script);
+}
+
 // --- Client Analytics Telemetry ---
 function trackOutboundClick(linkType, url, title) {
   try {
+    trackGAEvent('sermon_outflow', {
+      outflow_channel: linkType,
+      sermon_title: title || 'Pastor Niyi Teaching'
+    });
     fetch('/api/analytics/event', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -271,6 +302,7 @@ async function ask(text, retrying = false) {
   const timeout = window.createPastorChatTimeout(120000);
 
   try {
+    trackGAEvent('ask_question', { session_depth: history.length + 1 });
     const response = await fetch('/api/chat/stream', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1019,11 +1051,14 @@ window.submitMemberLogin = async function() {
   }
 };
 
-// Check Google OAuth Config & Setup with robust script load retry
+// Check Google OAuth & Google Analytics Config & Setup
 async function initGoogleOAuth() {
   try {
     const res = await fetch('/api/auth/config');
     const data = await res.json();
+    if (data.ga_measurement_id) {
+      initGoogleAnalytics(data.ga_measurement_id);
+    }
     if (!data.google_client_id) return;
     configuredGoogleClientId = data.google_client_id;
 

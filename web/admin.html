@@ -66,6 +66,10 @@
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
           Default password (0000) active · Change now
         </div>
+        <button type="button" class="btn secondary sm" onclick="openGAModal()" title="Configure Google Analytics 4 (GA4)">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 20V10"></path><path d="M12 20V4"></path><path d="M6 20v-6"></path></svg>
+          Google Analytics
+        </button>
         <button type="button" class="btn secondary sm" onclick="openGoogleOAuthModal()">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
           Google OAuth
@@ -377,6 +381,37 @@
     </div>
   </div>
 
-  <script src="/web/admin.js?v=20261111_v2"></script>
+  <!-- 5. GOOGLE ANALYTICS (GA4) CONFIG MODAL -->
+  <div id="ga-modal" class="modal-backdrop" hidden>
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>Google Analytics 4 (GA4)</h3>
+        <button type="button" class="close-btn" onclick="closeGAModal()">✕</button>
+      </div>
+      <form id="ga-config-form" onsubmit="event.preventDefault(); handleSaveGAMeasurementId();">
+        <div class="input-group">
+          <label for="ga-measurement-id-input">Measurement ID</label>
+          <input type="text" id="ga-measurement-id-input" placeholder="e.g. G-XXXXXXXXXX" autocomplete="off" spellcheck="false">
+          <small class="helper-text">
+            Enter your Google Analytics 4 Measurement ID (starts with <code>G-</code>).
+            Found in <a href="https://analytics.google.com" target="_blank" rel="noopener" style="color: var(--gold); text-decoration: underline;">Google Analytics</a> &gt; Admin &gt; Data Streams &gt; Web.
+          </small>
+        </div>
+
+        <div id="ga-config-msg" class="alert success" hidden></div>
+
+        <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 16px; font-size: 11px; color: var(--text-muted); line-height: 1.5;">
+          <strong style="color: #ffd750;">Privacy Shield Active:</strong> Google Analytics receives anonymous event signals (page visits, sermon clicks, topic categories). Member question text is 100% confidential and never transmitted.
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn ghost" onclick="closeGAModal()">Close</button>
+          <button type="submit" id="save-ga-btn" class="btn primary">Save Measurement ID</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="/web/admin.js?v=20261116_v1"></script>
 </body>
 </html>
