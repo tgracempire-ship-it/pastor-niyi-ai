@@ -22,8 +22,8 @@ window.trackGAEvent = function(eventName, eventParams = {}) {
 };
 
 function initGoogleAnalytics(measurementId) {
-  if (!measurementId || window._gaInitialized) return;
-  window._gaInitialized = true;
+  if (!measurementId || window._gaMeasurementId === measurementId) return;
+  window._gaMeasurementId = measurementId;
   window.dataLayer = window.dataLayer || [];
   function gtag(){dataLayer.push(arguments);}
   window.gtag = gtag;
